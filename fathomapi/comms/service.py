@@ -41,7 +41,7 @@ class Service:
             "isBase64Encoded": False
         }
 
-        push_sqs_sync(f'{self.name}-{{ENVIRONMENT}}-apigateway-async', payload)
+        push_sqs_sync(f'{self.name}-{{ENVIRONMENT}}-apigateway-async', payload, execute_at)
 
     def call_lambda_sync(self, function_name, payload=None):
         return invoke_lambda_sync(f'{self.name}-{{ENVIRONMENT}}-{function_name}', self.version, payload)
