@@ -25,7 +25,16 @@ class DynamodbEntity(Entity):
         return res[0]
 
     def patch(self, body, create=False, condition=None):
-        self.validate('PUT' if create else 'PATCH', body)
+        """
+        Update or upsert an item
+        :param dict body:
+        :param bool create: True = allow setting readonly properties and do not require the item to already exist;
+            None = allow setting readonly properties, but require the item to already exist; False = no modifying
+            readonly properties, require existence
+        :param ConditionBase condition: Extra dynamodb condition expression
+        :return:
+        """
+        self.validate('PATCH' if create is False else 'PUT', body)
         body = flatten(body)
 
         if condition is None:
