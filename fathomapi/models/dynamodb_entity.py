@@ -32,7 +32,8 @@ class DynamodbEntity(Entity):
             if not create:
                 condition = reduce(iand, [Attr(k).exists() for k in self.primary_key.keys()])
             else:
-                condition = ''
+                k = list(self.primary_key.keys())[0]
+                condition = Attr(k).exists() | Attr(k).not_exists()
         elif not create:
             condition &= reduce(iand, [Attr(k).exists() for k in self.primary_key.keys()])
 
