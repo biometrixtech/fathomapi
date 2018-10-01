@@ -76,6 +76,9 @@ class DynamodbEntity(Entity):
         self.patch(body, True)
         return self.primary_key
 
+    def delete(self):
+        self._get_dynamodb_resource().delete_item(Key=self.primary_key)
+
     @abstractmethod
     def _get_dynamodb_resource(self):
         raise NotImplementedError
