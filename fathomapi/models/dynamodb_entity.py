@@ -43,6 +43,8 @@ class DynamodbEntity(Entity):
                 if key in body:
                     if self._fields[key]['type'] in ['list', 'object']:
                         upsert.add(key, set(body[key]))
+                        if f'¬{key}' in body:
+                            upsert.delete(key, set(body[f'¬{key}']))
                     elif self._fields[key]['type'] == 'number':
                         upsert.set(key, Decimal(str(body[key])))
                     else:
@@ -116,6 +118,7 @@ class DynamodbEntity(Entity):
         def __init__(self):
             self._add = set([])
             self._set = set([])
+            self._delete = set([])
             self._parameter_names = []
             self._parameter_values = {}
             self._parameter_count = 0
@@ -130,11 +133,17 @@ class DynamodbEntity(Entity):
             self._add.add(f'#{key} = :{key}')
             self._parameter_values[f':{key}'] = value
 
+        def delete(self, field, value):
+            key = self._register_parameter_name(field)
+            self._delete.add(f'#{key} = :{key}')
+            self._parameter_values[f':{key}'] = value
+
         @property
         def update_expression(self):
             set_str = 'SET {}'.format(', '.join(self._set)) if len(self._set) else ''
             add_str = 'ADD {}'.format(', '.join(self._add)) if len(self._add) else ''
-            return set_str + ' ' + add_str
+            del_str = 'DELETE {}'.format(', '.join(self._delete)) if len(self._delete) else ''
+            return f'{set_str} {add_str} {del_str}'
 
         @property
         def parameter_names(self):
