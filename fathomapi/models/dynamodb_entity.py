@@ -40,7 +40,7 @@ class DynamodbEntity(Entity):
         try:
             upsert = self.DynamodbUpdate()
             for key in self.get_fields(immutable=None if create else False, primary_key=False):
-                if key in body:
+                if key in body or f'¬{key}' in body:
                     if self._fields[key]['type'] in ['list', 'object']:
                         upsert.add(key, set(body[key]))
                         if f'¬{key}' in body:
