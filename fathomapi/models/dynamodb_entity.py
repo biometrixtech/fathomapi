@@ -1,6 +1,6 @@
 from ._entity import Entity, flatten
 from abc import abstractmethod
-from boto3.dynamodb.conditions import Key, ConditionExpressionBuilder
+from boto3.dynamodb.conditions import Key, Attr, ConditionExpressionBuilder
 from botocore.exceptions import ClientError
 from decimal import Decimal
 from functools import reduce
@@ -24,9 +24,17 @@ class DynamodbEntity(Entity):
         print(res[0])
         return res[0]
 
-    def patch(self, body, create=False):
+    def patch(self, body, create=False, condition=None):
         self.validate('PUT' if create else 'PATCH', body)
         body = flatten(body)
+
+        if condition is None:
+            if not create:
+                condition = reduce(iand, [Attr(k).exists() for k in self.primary_key.keys()])
+            else:
+                condition = ''
+        elif not create:
+            condition &= reduce(iand, [Attr(k).exists() for k in self.primary_key.keys()])
 
         try:
             upsert = self.DynamodbUpdate()
@@ -50,8 +58,8 @@ class DynamodbEntity(Entity):
                 UpdateExpression=upsert.update_expression,
                 ExpressionAttributeNames=upsert.parameter_names,
                 ExpressionAttributeValues=upsert.parameter_values,
+                ConditionExpression=condition
             )
-            # TODO include conditional check if create=False
 
             return self.get()
 
