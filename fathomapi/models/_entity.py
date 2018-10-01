@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from decimal import Decimal
 from functools import reduce
+import json
 
 from ..utils.exceptions import InvalidSchemaException, NoSuchEntityException, ImmutableFieldUpdatedException
 
@@ -47,10 +48,11 @@ class Entity:
     def primary_key(self):
         return self._primary_key
 
-    @staticmethod
-    @abstractmethod
-    def schema():
-        raise NotImplementedError
+    @classmethod
+    def schema(cls):
+        class_name = cls.__name__.lower()
+        with open(f'schemas/{class_name}.json', 'r') as f:
+            return json.load(f)
 
     def get_fields(self, *, immutable=None, required=None, primary_key=None):
         return [

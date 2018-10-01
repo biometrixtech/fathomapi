@@ -14,10 +14,6 @@ class IotEntity(Entity):
     def __init__(self, thing_id):
         super().__init__({'id': thing_id})
 
-    @staticmethod
-    def schema():
-        raise NotImplementedError
-
     @property
     @abstractmethod
     def thing_type(self):

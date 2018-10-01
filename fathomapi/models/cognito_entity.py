@@ -19,11 +19,6 @@ class CognitoEntity(Entity):
     def username(self):
         raise NotImplementedError
 
-    @staticmethod
-    @abstractmethod
-    def schema():
-        raise NotImplementedError
-
     @property
     @abstractmethod
     def user_pool_id(self):
