@@ -132,9 +132,9 @@ class DynamodbEntity(Entity):
 
         @property
         def update_expression(self):
-            set = 'SET {}'.format(', '.join(self._set)) if len(self._set) else ''
-            add = 'ADD {}'.format(', '.join(self._add)) if len(self._add) else ''
-            return set + ' ' + add
+            set_str = 'SET {}'.format(', '.join(self._set)) if len(self._set) else ''
+            add_str = 'ADD {}'.format(', '.join(self._add)) if len(self._add) else ''
+            return set_str + ' ' + add_str
 
         @property
         def parameter_names(self):
