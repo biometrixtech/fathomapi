@@ -2,6 +2,7 @@ from abc import abstractmethod
 from decimal import Decimal
 from functools import reduce
 import json
+import re
 
 from ..utils.exceptions import InvalidSchemaException, NoSuchEntityException, ImmutableFieldUpdatedException
 
@@ -50,7 +51,7 @@ class Entity:
 
     @classmethod
     def schema(cls):
-        class_name = cls.__name__.lower()
+        class_name = camel_to_snake(cls.__name__)
         with open(f'schemas/{class_name}.json', 'r') as f:
             return json.load(f)
 
@@ -188,3 +189,13 @@ def unflatten(d):
             d2 = d2[part]
         d2[key_parts[-1]] = value
     return ret
+
+
+def camel_to_snake(string):
+    """
+    Convert a string in lowerCamelCase or UpperCamelCase to snake_case
+    :param str string:
+    :return str
+    """
+    s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', string)
+    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
