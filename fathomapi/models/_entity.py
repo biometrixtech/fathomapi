@@ -77,9 +77,9 @@ class Entity:
             return value
         elif isinstance(field_type, list):
             # TODO validate items
-            if not isinstance(value, list):
-                raise ValueError(f'{field} must be a list')
-            return value
+            if not isinstance(value, (list, set)):
+                raise ValueError(f'{field} must be a list, not {type(value)} ({value})')
+            return list(value)
         elif field_type == 'string':
             return str(value)
         elif field_type == 'number':

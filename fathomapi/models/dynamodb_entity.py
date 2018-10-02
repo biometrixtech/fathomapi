@@ -6,9 +6,10 @@ from decimal import Decimal
 from functools import reduce
 from operator import iand
 import datetime
+import json
 
 from ..utils.formatters import format_datetime
-
+from ..utils.serialisable import json_serialise
 from ..utils.exceptions import NoSuchEntityException, DuplicateEntityException, NoUpdatesException
 
 
@@ -24,59 +25,35 @@ class DynamodbEntity(Entity):
         print(res[0])
         return res[0]
 
-    def patch(self, body, create=False, condition=None):
+    def patch(self, body):
         """
-        Update or upsert an item
+        Update an item
         :param dict body:
-        :param bool create: True = allow setting readonly properties and do not require the item to already exist;
-            None = allow setting readonly properties, but require the item to already exist; False = no modifying
-            readonly properties, require existence
-        :param ConditionBase condition: Extra dynamodb condition expression
         :return:
         """
-        self.validate('PATCH' if create is False else 'PUT', body)
+        self.validate('PATCH', body)
         body = flatten(body)
 
-        if condition is None:
-            if not create:
-                condition = reduce(iand, [Attr(k).exists() for k in self.primary_key.keys()])
-            else:
-                k = list(self.primary_key.keys())[0]
-                condition = Attr(k).exists() | Attr(k).not_exists()
-        elif not create:
-            condition &= reduce(iand, [Attr(k).exists() for k in self.primary_key.keys()])
+        condition = reduce(iand, [Attr(k).exists() for k in self.primary_key.keys()])
+
+        keys = self.get_fields(immutable=False, primary_key=False)
+        upsert = self.DynamodbUpdate()
+        for key in keys:
+            if isinstance(self._fields[key]['type'], list):
+                if key in body:
+                    upsert.add(key, set(body[key]))
+                if f'¬{key}' in body:
+                    upsert.delete(key, set(body[f'¬{key}']).difference({'_empty'}))
+                if f'@{key}' in body:
+                    upsert.set(key, set(body[f'@{key}']).union({'_empty'}))
+            elif self._fields[key]['type'] == 'number':
+                if key in body:
+                    upsert.set(key, Decimal(str(body[key])))
+            elif key in body:
+                upsert.set(key, body[key])
 
         try:
-            upsert = self.DynamodbUpdate()
-            for key in self.get_fields(immutable=None if create else False, primary_key=False):
-                if key in body or f'¬{key}' in body:
-                    if self._fields[key]['type'] in ['list', 'object']:
-                        upsert.add(key, set(body[key]))
-                        if f'¬{key}' in body:
-                            upsert.delete(key, set(body[f'¬{key}']))
-                    elif self._fields[key]['type'] == 'number':
-                        upsert.set(key, Decimal(str(body[key])))
-                    else:
-                        upsert.set(key, body[key])
-
-            if len(upsert.parameter_values) == 0:
-                raise NoUpdatesException()
-
-            # Update updated_date, if we're updating anything else
-            upsert.set('updated_date', format_datetime(datetime.datetime.now()))
-            if create:
-                upsert.set('created_date', format_datetime(datetime.datetime.now()))
-
-            self._get_dynamodb_resource().update_item(
-                Key=self.primary_key,
-                UpdateExpression=upsert.update_expression,
-                ExpressionAttributeNames=upsert.parameter_names,
-                ExpressionAttributeValues=upsert.parameter_values,
-                ConditionExpression=condition
-            )
-
-            return self.get()
-
+            return self._update_dynamodb(upsert, condition)
         except ClientError as e:
             if 'ConditionalCheckFailed' in str(e):
                 raise DuplicateEntityException()
@@ -85,7 +62,39 @@ class DynamodbEntity(Entity):
                 raise
 
     def create(self, body):
-        self.patch(body, True)
+        """
+        Create
+        :param dict body:
+        :return:
+        """
+        self.validate('PUT', body)
+        body = flatten(body)
+
+        k = list(self.primary_key.keys())[0]
+        condition = Attr(k).exists() | Attr(k).not_exists()
+        body['created_date'] = format_datetime(datetime.datetime.now())
+
+        keys = self.get_fields(immutable=None, primary_key=False)
+        upsert = self.DynamodbUpdate()
+        for key in keys:
+            if isinstance(self._fields[key]['type'], list):
+                if key in body:
+                    upsert.set(key, set(body[key]).union({'_empty'}))
+            elif self._fields[key]['type'] == 'number':
+                if key in body:
+                    upsert.set(key, Decimal(str(body[key])))
+            elif key in body:
+                upsert.set(key, body[key])
+
+        try:
+            self._update_dynamodb(upsert, condition)
+        except ClientError as e:
+            if 'ConditionalCheckFailed' in str(e):
+                raise DuplicateEntityException()
+            else:
+                print(str(e))
+                raise
+
         return self.primary_key
 
     def delete(self):
@@ -96,7 +105,7 @@ class DynamodbEntity(Entity):
         raise NotImplementedError
 
     def _query_dynamodb(self, key_condition_expression, limit=10000, scan_index_forward=True, exclusive_start_key=None):
-        self._print_condition_expression(key_condition_expression)
+        self._print_condition_expression(key_condition_expression, True)
         if exclusive_start_key is not None:
             ret = self._get_dynamodb_resource().query(
                 Select='ALL_ATTRIBUTES',
@@ -119,9 +128,34 @@ class DynamodbEntity(Entity):
             # No more items
             return ret['Items']
 
+    def _update_dynamodb(self, upsert, condition_expression):
+            print(json.dumps({
+                'Key': self.primary_key,
+                'UpdateExpression': upsert.update_expression,
+                'ExpressionAttributeNames': upsert.parameter_names,
+                'ExpressionAttributeValues': upsert.parameter_values,
+                'ConditionExpression': ConditionExpressionBuilder().build_expression(condition_expression, False),
+            }, default=json_serialise))
+
+            if len(upsert.parameter_names) == 0:
+                raise NoUpdatesException()
+
+            # Update updated_date, if we're updating anything else
+            upsert.set('updated_date', format_datetime(datetime.datetime.now()))
+
+            self._get_dynamodb_resource().update_item(
+                Key=self.primary_key,
+                UpdateExpression=upsert.update_expression,
+                ExpressionAttributeNames=upsert.parameter_names,
+                ExpressionAttributeValues=upsert.parameter_values,
+                ConditionExpression=condition_expression
+            )
+
+            return self.get()
+
     @staticmethod
-    def _print_condition_expression(expression):
-        print(ConditionExpressionBuilder().build_expression(expression, True))
+    def _print_condition_expression(expression, is_key_condition):
+        print(ConditionExpressionBuilder().build_expression(expression, is_key_condition))
 
     class DynamodbUpdate:
         def __init__(self):
@@ -134,18 +168,21 @@ class DynamodbEntity(Entity):
 
         def set(self, field, value):
             key = self._register_parameter_name(field)
-            self._set.add(f'#{key} = :{key}')
-            self._parameter_values[f':{key}'] = value
+            if key is not None:
+                self._set.add(f'#{key} = :{key}')
+                self._parameter_values[f':{key}'] = value
 
         def add(self, field, value):
             key = self._register_parameter_name(field)
-            self._add.add(f'#{key} = :{key}')
-            self._parameter_values[f':{key}'] = value
+            if key is not None:
+                self._add.add(f'#{key} :{key}')
+                self._parameter_values[f':{key}'] = value
 
         def delete(self, field, value):
             key = self._register_parameter_name(field)
-            self._delete.add(f'#{key} = :{key}')
-            self._parameter_values[f':{key}'] = value
+            if key is not None:
+                self._delete.add(f'#{key} :{key}')
+                self._parameter_values[f':{key}'] = value
 
         @property
         def update_expression(self):
@@ -163,6 +200,8 @@ class DynamodbEntity(Entity):
             return self._parameter_values
 
         def _register_parameter_name(self, parameter_name):
+            if parameter_name in self._parameter_names:
+                return None
             self._parameter_names.append(parameter_name)
             return 'p' + str(len(self._parameter_names) - 1)
 
@@ -172,3 +211,4 @@ class DynamodbEntity(Entity):
                 'parameter_names': self.parameter_names,
                 'parameter_values': self.parameter_values,
             })
+

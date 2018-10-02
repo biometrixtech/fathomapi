@@ -33,6 +33,11 @@ class UnauthorizedException(ApplicationException):
         super().__init__(401, 'Unauthorized', message)
 
 
+class PaymentRequiredException(ApplicationException):
+    def __init__(self, message=''):
+        super().__init__(402, 'PaymentRequired', message)
+
+
 class ForbiddenException(ApplicationException):
     def __init__(self, message=''):
         super().__init__(403, 'Forbidden', message)
