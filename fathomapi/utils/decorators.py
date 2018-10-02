@@ -45,7 +45,7 @@ class require:
                 if 'Authorization' not in request.headers:
                     raise UnauthorizedException("Unauthorized")
                 principal_id = _authenticate_user(request.headers['Authorization'])
-                if len(args) == 0 or args[0] is None or args[0] != principal_id:
+                if len(kwargs) == 0 or list(kwargs.values())[0] != principal_id:
                     raise UnauthorizedException("You may only execute this action on yourself")
                 return decorated_function(*args, **kwargs)
             return wrapper

@@ -145,6 +145,11 @@ class Entity:
 
     @abstractmethod
     def create(self, body):
+        """
+        Create a new entity
+        :param dict body:
+        :return: entity id
+        """
         raise NotImplementedError()
 
     @abstractmethod
