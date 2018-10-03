@@ -31,7 +31,7 @@ def handler(event, context):
     else:
         xray_recorder.begin_segment(name=xray_trace_name)
 
-    xray_recorder.current_segment().put_http_meta('url', f"https://apis.{Config.get('ENVIRONMENT')}.fathomai.com/{Config.get('SERVICE')}/{Config.get('API_VERSION')}{event['path']}")
+    xray_recorder.current_segment().put_http_meta('url', f"https://apis.{Config.get('ENVIRONMENT')}.fathomai.com/{Config.get('SERVICE')}/{Config.get('API_VERSION')}{event['pathParameters']['endpoint']}")
     xray_recorder.current_segment().put_http_meta('method', event['httpMethod'])
     xray_recorder.current_segment().put_http_meta('user_agent', event['headers']['User-Agent'])
     xray_recorder.current_segment().put_annotation('environment', Config.get('ENVIRONMENT'))
