@@ -10,5 +10,12 @@ def format_datetime(date_input):
     if date_input is None:
         return None
     if not isinstance(date_input, datetime.datetime):
-        date_input = datetime.datetime.strptime(date_input, "%Y-%m-%dT%H:%M:%S.%f")
+        for format_string in ["%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S.%fZ"]:
+            try:
+                date_input = datetime.datetime.strptime(date_input, format_string)
+                break
+            except ValueError:
+                continue
+        else:
+            raise ValueError('Unrecognised datetime format')
     return date_input.strftime("%Y-%m-%dT%H:%M:%SZ")

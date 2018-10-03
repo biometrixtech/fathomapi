@@ -42,7 +42,7 @@ class CognitoEntity(Entity):
 
     @classmethod
     def get_many(cls, next_token=None, **kwargs):
-        args = {'UserPoolId': cls.user_pool_id, 'Limit': 100}
+        args = {'UserPoolId': cls.user_pool_id(), 'Limit': 100}
         if len(kwargs) == 1:
             raise NotImplementedError
         elif len(kwargs) > 1:
@@ -67,7 +67,7 @@ class CognitoEntity(Entity):
     def _fetch(self):
         try:
             res = _cognito_client.admin_get_user(
-                UserPoolId=self.user_pool_id,
+                UserPoolId=self.user_pool_id(),
                 Username=self.username,
             )
             self._id = res['Username']
@@ -91,12 +91,12 @@ class CognitoEntity(Entity):
 
         if self.exists():
             _cognito_client.admin_update_user_attributes(
-                UserPoolId=self.user_pool_id,
+                UserPoolId=self.user_pool_id(),
                 Username=self.username,
                 UserAttributes=attributes_to_update
             )
             _cognito_client.admin_delete_user_attributes(
-                UserPoolId=self.user_pool_id,
+                UserPoolId=self.user_pool_id(),
                 Username=self.username,
                 UserAttributeNames=attributes_to_delete
             )
@@ -113,7 +113,7 @@ class CognitoEntity(Entity):
 
         try:
             _cognito_client.admin_create_user(
-                UserPoolId=self.user_pool_id,
+                UserPoolId=self.user_pool_id(),
                 Username=self.username,
                 TemporaryPassword=body['password'],
                 UserAttributes=[
@@ -145,7 +145,7 @@ class CognitoEntity(Entity):
     def delete(self):
         try:
             _cognito_client.admin_delete_user(
-                UserPoolId=self.user_pool_id,
+                UserPoolId=self.user_pool_id(),
                 Username=self.username
             )
         except ClientError as e:
@@ -167,8 +167,8 @@ class CognitoEntity(Entity):
     def _login_password(self, password):
         try:
             response = _cognito_client.admin_initiate_auth(
-                UserPoolId=self.user_pool_id,
-                ClientId=self.user_pool_client_id,
+                UserPoolId=self.user_pool_id(),
+                ClientId=self.user_pool_client_id(),
                 AuthFlow='ADMIN_NO_SRP_AUTH',
                 AuthParameters={
                     'USERNAME': self.username,
@@ -185,8 +185,8 @@ class CognitoEntity(Entity):
         if 'ChallengeName' in response and response['ChallengeName'] == "NEW_PASSWORD_REQUIRED":
             # Need to set a new password
             response = _cognito_client.admin_respond_to_auth_challenge(
-                UserPoolId=self.user_pool_id,
-                ClientId=self.user_pool_client_id,
+                UserPoolId=self.user_pool_id(),
+                ClientId=self.user_pool_client_id(),
                 ChallengeName='NEW_PASSWORD_REQUIRED',
                 ChallengeResponses={'USERNAME': self.username, 'NEW_PASSWORD': password},
                 Session=response['Session']
@@ -202,8 +202,8 @@ class CognitoEntity(Entity):
     def _login_token(self, token):
         try:
             response = _cognito_client.admin_initiate_auth(
-                UserPoolId=self.user_pool_id,
-                ClientId=self.user_pool_client_id,
+                UserPoolId=self.user_pool_id(),
+                ClientId=self.user_pool_client_id(),
                 AuthFlow='REFRESH_TOKEN_AUTH',
                 AuthParameters={
                     'USERNAME': self.username,
@@ -228,7 +228,7 @@ class CognitoEntity(Entity):
     def logout(self):
         try:
             _cognito_client.admin_user_global_sign_out(
-                UserPoolId=self.user_pool_id,
+                UserPoolId=self.user_pool_id(),
                 Username=self.username,
             )
         except ClientError as e:
