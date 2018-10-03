@@ -9,6 +9,14 @@ def handler(event, context):
     if Config.get('ENVIRONMENT') != 'production':
         print(json.dumps(event))
 
+    if 'eventSourceARN' in event['requestContext'] and 'sqs' in event['requestContext']['eventSourceARN']:
+        # An asynchronous invocation from SQS
+        print('Asynchronous invocation')
+        event['headers']['X-Source'] = 'sqs'
+    else:
+        print('API Gateway invocation')
+        event['headers']['X-Source'] = 'apigateway'
+
     Config.set('API_VERSION', event['stageVariables']['LambdaAlias'])
 
     # Pass tracing info to X-Ray
