@@ -8,7 +8,7 @@ import json
 from fathomapi.utils.exceptions import NoSuchEntityException, DuplicateEntityException, InvalidPasswordFormatException, UnauthorizedException
 
 
-cognito_client = boto3.client('cognito-idp')
+_cognito_client = boto3.client('cognito-idp')
 
 
 class CognitoEntity(Entity):
@@ -19,14 +19,14 @@ class CognitoEntity(Entity):
     def username(self):
         raise NotImplementedError
 
-    @property
+    @classmethod
     @abstractmethod
-    def user_pool_id(self):
+    def user_pool_id(cls):
         raise NotImplementedError
 
-    @property
+    @classmethod
     @abstractmethod
-    def user_pool_client_id(self):
+    def user_pool_client_id(cls):
         raise NotImplementedError
 
     @property
@@ -40,9 +40,33 @@ class CognitoEntity(Entity):
         ret['id'] = self._id
         return ret
 
+    @classmethod
+    def get_many(cls, next_token=None, **kwargs):
+        args = {'UserPoolId': cls.user_pool_id, 'Limit': 100}
+        if len(kwargs) == 1:
+            raise NotImplementedError
+        elif len(kwargs) > 1:
+            raise Exception('CognitoEntity can only be filtered on one property')
+
+        if next_token is not None:
+            args['PaginationToken'] = next_token
+
+        res = _cognito_client.list_users(**args)
+
+        ret = []
+        for user in res['Users']:
+            obj = cls(user['thingName'])
+            obj._hydrate(user['attributes'])
+            ret.append(obj)
+
+        if 'PaginationToken' in res:
+            ret += cls.get_many(res['PaginationToken'], **kwargs)
+
+        return ret
+
     def _fetch(self):
         try:
-            res = cognito_client.admin_get_user(
+            res = _cognito_client.admin_get_user(
                 UserPoolId=self.user_pool_id,
                 Username=self.username,
             )
@@ -66,12 +90,12 @@ class CognitoEntity(Entity):
                     attributes_to_update.append({'Name': 'custom:{}'.format(key), 'Value': str(body[key])})
 
         if self.exists():
-            cognito_client.admin_update_user_attributes(
+            _cognito_client.admin_update_user_attributes(
                 UserPoolId=self.user_pool_id,
                 Username=self.username,
                 UserAttributes=attributes_to_update
             )
-            cognito_client.admin_delete_user_attributes(
+            _cognito_client.admin_delete_user_attributes(
                 UserPoolId=self.user_pool_id,
                 Username=self.username,
                 UserAttributeNames=attributes_to_delete
@@ -88,7 +112,7 @@ class CognitoEntity(Entity):
         self.validate('PUT', body)
 
         try:
-            cognito_client.admin_create_user(
+            _cognito_client.admin_create_user(
                 UserPoolId=self.user_pool_id,
                 Username=self.username,
                 TemporaryPassword=body['password'],
@@ -120,7 +144,7 @@ class CognitoEntity(Entity):
 
     def delete(self):
         try:
-            cognito_client.admin_delete_user(
+            _cognito_client.admin_delete_user(
                 UserPoolId=self.user_pool_id,
                 Username=self.username
             )
@@ -142,7 +166,7 @@ class CognitoEntity(Entity):
 
     def _login_password(self, password):
         try:
-            response = cognito_client.admin_initiate_auth(
+            response = _cognito_client.admin_initiate_auth(
                 UserPoolId=self.user_pool_id,
                 ClientId=self.user_pool_client_id,
                 AuthFlow='ADMIN_NO_SRP_AUTH',
@@ -160,7 +184,7 @@ class CognitoEntity(Entity):
             raise
         if 'ChallengeName' in response and response['ChallengeName'] == "NEW_PASSWORD_REQUIRED":
             # Need to set a new password
-            response = cognito_client.admin_respond_to_auth_challenge(
+            response = _cognito_client.admin_respond_to_auth_challenge(
                 UserPoolId=self.user_pool_id,
                 ClientId=self.user_pool_client_id,
                 ChallengeName='NEW_PASSWORD_REQUIRED',
@@ -177,7 +201,7 @@ class CognitoEntity(Entity):
 
     def _login_token(self, token):
         try:
-            response = cognito_client.admin_initiate_auth(
+            response = _cognito_client.admin_initiate_auth(
                 UserPoolId=self.user_pool_id,
                 ClientId=self.user_pool_client_id,
                 AuthFlow='REFRESH_TOKEN_AUTH',
@@ -203,7 +227,7 @@ class CognitoEntity(Entity):
 
     def logout(self):
         try:
-            cognito_client.admin_user_global_sign_out(
+            _cognito_client.admin_user_global_sign_out(
                 UserPoolId=self.user_pool_id,
                 Username=self.username,
             )

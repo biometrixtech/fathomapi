@@ -42,11 +42,27 @@ class IotEntity(Entity):
         raise NotImplementedError
 
     @classmethod
-    def get_many(cls, key, value):
-        things = iot_client.list_things(attributeName=key, attributeValue=value)['things']
+    def get_many(cls, next_token=None, **kwargs):
+        if len(kwargs) == 0:
+            args = {}
+        elif len(kwargs) == 1:
+            key, value = next(iter(kwargs.items()))
+            args = {'attributeName': key, 'attributeValue': value}
+        else:
+            raise Exception('IoTEntity can only be filtered on one property')
+
+        if next_token is not None:
+            args['nextToken'] = next_token
+
+        res = iot_client.list_things(**args)
+
         ret = []
-        for thing in things:
+        for thing in res['things']:
             obj = cls(thing['thingName'])
             obj._hydrate(thing['attributes'])
             ret.append(obj)
+
+        if 'nextToken' in res:
+            ret += cls.get_many(res['nextToken'], **kwargs)
+
         return ret
