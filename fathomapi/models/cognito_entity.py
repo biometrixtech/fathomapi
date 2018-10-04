@@ -194,7 +194,8 @@ class CognitoEntity(Entity):
 
         expiry_date = datetime.datetime.now() + datetime.timedelta(seconds=response['AuthenticationResult']['ExpiresIn'])
         return {
-            'jwt': response['AuthenticationResult']['AccessToken'],
+            'jwt': response['AuthenticationResult']['IdToken'],
+            'access_token': response['AuthenticationResult']['AccessToken'],
             'expires': expiry_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
             'session_token': response['AuthenticationResult']['RefreshToken'],
         }
@@ -220,7 +221,8 @@ class CognitoEntity(Entity):
 
         expiry_date = datetime.datetime.now() + datetime.timedelta(seconds=response['AuthenticationResult']['ExpiresIn'])
         return {
-            'jwt': response['AuthenticationResult']['AccessToken'],
+            'jwt': response['AuthenticationResult']['IdToken'],
+            'access_token': response['AuthenticationResult']['AccessToken'],
             'expires': expiry_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
             'session_token': token,
         }
@@ -235,3 +237,4 @@ class CognitoEntity(Entity):
             if 'UserNotFoundException' in str(e):
                 raise NoSuchEntityException()
             raise
+

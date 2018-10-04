@@ -1,9 +1,14 @@
 from flask import request
-from werkzeug.routing import BaseConverter, ValidationError
 from functools import wraps
+from jose import jwk, jwt
+from jose.utils import base64url_decode
+from werkzeug.routing import BaseConverter, ValidationError
+import datetime
+import json
+import urllib.request
 
 from .exceptions import UnauthorizedException, InvalidSchemaException, ForbiddenException
-from ..comms.service import Service
+from ..api.config import Config
 
 
 # Using classes as namespaces
@@ -22,7 +27,7 @@ class require:
             def wrapper(*args, **kwargs):
                 if 'Authorization' not in request.headers:
                     raise UnauthorizedException("Unauthorized")
-                principal_id = _authenticate_user(request.headers['Authorization'])
+                principal_id = _authenticate_jwt(request.headers['Authorization'])
 
                 # Try passing the principal_id to the internal function, but this will fail if the function definition
                 # doesn't 'want' the parameter by specifying a named parameter value for it
@@ -44,7 +49,7 @@ class require:
             def wrapper(*args, **kwargs):
                 if 'Authorization' not in request.headers:
                     raise UnauthorizedException("Unauthorized")
-                principal_id = _authenticate_user(request.headers['Authorization'])
+                principal_id = _authenticate_jwt(request.headers['Authorization'])
                 if len(kwargs) == 0 or list(kwargs.values())[0] != principal_id:
                     raise UnauthorizedException("You may only execute this action on yourself")
                 return decorated_function(*args, **kwargs)
@@ -59,7 +64,7 @@ class require:
             def wrapper(*args, **kwargs):
                 if 'Authorization' not in request.headers:
                     raise UnauthorizedException("Unauthorized")
-                principal_id = _authenticate_user(request.headers['Authorization'])
+                principal_id = _authenticate_jwt(request.headers['Authorization'])
                 if principal_id != '00000000-0000-4000-8000-000000000000':
                     raise ForbiddenException("This endpoint may only be called internally")
                 return decorated_function(*args, **kwargs)
@@ -125,12 +130,57 @@ class require:
         return wrap
 
 
-def _authenticate_user(jwt):
-    res = Service('users', '1_0').call_lambda_sync('apigateway-validateauth', {"authorizationToken": jwt})
+def _authenticate_jwt(raw_token):
 
-    if 'principalId' in res:
-        # Success
-        return res['principalId']
-    elif 'errorMessage' in res:
-        # Some failure
-        raise UnauthorizedException()
+    try:
+        token = jwt.get_unverified_claims(raw_token)
+        public_key = _get_rs256_public_key(raw_token)
+
+        message, encoded_signature = str(raw_token).rsplit('.', 1)
+        decoded_signature = base64url_decode(encoded_signature.encode('utf-8'))
+
+        if not public_key.verify(message.encode("utf8"), decoded_signature):
+            raise UnauthorizedException('Signature verification failed')
+
+        print({'jwt_token': token})
+
+        for field in ['cognito:username', 'username', 'sub']:
+            if field in token:
+                principal_id = token[field]
+                break
+        else:
+            raise UnauthorizedException('No principal id in token')
+
+        if 'exp' not in token:
+            raise UnauthorizedException('No expiry time in token')
+        expiry_date = datetime.datetime.fromtimestamp(token['exp'])
+        now = datetime.datetime.utcnow()
+        if expiry_date < now:
+            raise UnauthorizedException(f'Token has expired: {expiry_date.isoformat()} < {now.isoformat()}')
+
+        return principal_id
+
+    except UnauthorizedException:
+        raise
+    except Exception:
+        raise UnauthorizedException('JWT token verification failed')
+
+
+cognito_keys_cache = {}
+
+
+def _get_rs256_public_key(raw_token):
+    key_id = jwt.get_unverified_header(raw_token)['kid']
+
+    if key_id not in cognito_keys_cache:
+        token = jwt.get_unverified_claims(raw_token)
+        cognito_userpool_id = token['iss'].split('/')[-1]
+        cognito_keys_url = f'https://cognito-idp.{Config.get("AWS_DEFAULT_REGION")}.amazonaws.com/{cognito_userpool_id}/.well-known/jwks.json'
+        print(f'Loading new keys from {cognito_keys_url}')
+        keys = json.loads(urllib.request.urlopen(cognito_keys_url).read())
+        cognito_keys_cache.update({k['kid']: k for k in keys['keys']})
+
+    if key_id not in cognito_keys_cache:
+        raise UnauthorizedException('Unknown signing key')
+
+    return jwk.construct(cognito_keys_cache[key_id])
