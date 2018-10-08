@@ -49,4 +49,4 @@ class Service:
 
 @xray_recorder.capture('fathomapi.comms.service._get_service_token')
 def _get_service_token():
-    return invoke_lambda_sync('users-{ENVIRONMENT}-apigateway-serviceauth', '1_0')['token']
+    return invoke_lambda_sync('users-{ENVIRONMENT}-apigateway-serviceauth', '2_0')['token']
