@@ -42,7 +42,7 @@ class CognitoEntity(Entity):
 
     @classmethod
     def get_many(cls, next_token=None, **kwargs):
-        args = {'UserPoolId': cls.user_pool_id(), 'Limit': 100}
+        args = {'UserPoolId': cls.user_pool_id(), 'Limit': 60}
         if len(kwargs) == 1:
             raise NotImplementedError
         elif len(kwargs) > 1:
