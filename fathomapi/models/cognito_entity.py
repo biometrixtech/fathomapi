@@ -14,11 +14,6 @@ _cognito_client = boto3.client('cognito-idp')
 class CognitoEntity(Entity):
     _id = None
 
-    @property
-    @abstractmethod
-    def username(self):
-        raise NotImplementedError
-
     @classmethod
     @abstractmethod
     def user_pool_id(cls):
@@ -57,6 +52,7 @@ class CognitoEntity(Entity):
         for user in res['Users']:
             obj = cls(user['Username'])
             obj._hydrate(user['Attributes'])
+            obj._id = user['Username']
             ret.append(obj)
 
         if 'PaginationToken' in res:
@@ -68,7 +64,7 @@ class CognitoEntity(Entity):
         try:
             res = _cognito_client.admin_get_user(
                 UserPoolId=self.user_pool_id(),
-                Username=self.username,
+                Username=self.id,
             )
             self._id = res['Username']
             return {prop['Name'].split(':')[-1]: prop['Value'] for prop in res['UserAttributes']}
@@ -92,12 +88,12 @@ class CognitoEntity(Entity):
         if self.exists():
             _cognito_client.admin_update_user_attributes(
                 UserPoolId=self.user_pool_id(),
-                Username=self.username,
+                Username=self.id,
                 UserAttributes=attributes_to_update
             )
             _cognito_client.admin_delete_user_attributes(
                 UserPoolId=self.user_pool_id(),
-                Username=self.username,
+                Username=self.id,
                 UserAttributeNames=attributes_to_delete
             )
         else:
@@ -114,7 +110,7 @@ class CognitoEntity(Entity):
         try:
             _cognito_client.admin_create_user(
                 UserPoolId=self.user_pool_id(),
-                Username=self.username,
+                Username=self.id,
                 TemporaryPassword=body['password'],
                 UserAttributes=[
                     {'Name': 'custom:{}'.format(key), 'Value': body[key]}
@@ -146,7 +142,7 @@ class CognitoEntity(Entity):
         try:
             _cognito_client.admin_delete_user(
                 UserPoolId=self.user_pool_id(),
-                Username=self.username
+                Username=self.id
             )
         except ClientError as e:
             if 'UserNotFoundException' in str(e):
@@ -171,7 +167,7 @@ class CognitoEntity(Entity):
                 ClientId=self.user_pool_client_id(),
                 AuthFlow='ADMIN_NO_SRP_AUTH',
                 AuthParameters={
-                    'USERNAME': self.username,
+                    'USERNAME': self.id,
                     'PASSWORD': password
                 },
             )
@@ -188,7 +184,7 @@ class CognitoEntity(Entity):
                 UserPoolId=self.user_pool_id(),
                 ClientId=self.user_pool_client_id(),
                 ChallengeName='NEW_PASSWORD_REQUIRED',
-                ChallengeResponses={'USERNAME': self.username, 'NEW_PASSWORD': password},
+                ChallengeResponses={'USERNAME': self.id, 'NEW_PASSWORD': password},
                 Session=response['Session']
             )
 
@@ -207,7 +203,7 @@ class CognitoEntity(Entity):
                 ClientId=self.user_pool_client_id(),
                 AuthFlow='REFRESH_TOKEN_AUTH',
                 AuthParameters={
-                    'USERNAME': self.username,
+                    'USERNAME': self.id,
                     'REFRESH_TOKEN': token
                 },
             )
@@ -231,7 +227,7 @@ class CognitoEntity(Entity):
         try:
             _cognito_client.admin_user_global_sign_out(
                 UserPoolId=self.user_pool_id(),
-                Username=self.username,
+                Username=self.id,
             )
         except ClientError as e:
             if 'UserNotFoundException' in str(e):
