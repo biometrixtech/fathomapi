@@ -56,7 +56,7 @@ class CognitoEntity(Entity):
         ret = []
         for user in res['Users']:
             obj = cls(user['Username'])
-            obj._hydrate(user['attributes'])
+            obj._hydrate(user['Attributes'])
             ret.append(obj)
 
         if 'PaginationToken' in res:
