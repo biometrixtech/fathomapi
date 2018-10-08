@@ -29,7 +29,7 @@ class Service:
             "httpMethod": method,
             "headers": {
                 "Accept": "*/*",
-                "Authorization": request.headers.get('Authorization', None),
+                "Authorization": _get_service_token(),
                 "Content-Type": "application/json",
                 "User-Agent": f"Biometrix/API {self.name}:{self.version}",
                 "X-Execute-At": format_datetime(execute_at),
