@@ -55,7 +55,7 @@ class CognitoEntity(Entity):
 
         ret = []
         for user in res['Users']:
-            obj = cls(user['thingName'])
+            obj = cls(user['username'])
             obj._hydrate(user['attributes'])
             ret.append(obj)
 
