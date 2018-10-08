@@ -5,6 +5,7 @@ from jose.exceptions import JWTError
 from werkzeug.routing import BaseConverter, ValidationError
 import datetime
 import json
+import os
 import re
 import urllib.request
 
@@ -177,9 +178,10 @@ def _get_rs256_public_key(raw_token):
     key_id = jwt.get_unverified_header(raw_token)['kid']
 
     if key_id not in cognito_keys_cache:
-        if re.match('^jwt_\d+$', key_id):
-            print('Loading local keys')
-            with open('fathom.jwks', 'r') as f:
+        if re.match('^fathom_\d+$', key_id):
+            path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fathom.jwks')
+            print(f'Loading local keys from {path}')
+            with open(path, 'r') as f:
                 keys = json.load(f)
         else:
             token = jwt.get_unverified_claims(raw_token)
