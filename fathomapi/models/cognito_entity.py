@@ -108,15 +108,16 @@ class CognitoEntity(Entity):
         self.validate('PUT', body)
 
         try:
+            attributes = [{'Name': 'email_verified', 'Value': True}]
+            for key in self.get_fields(primary_key=False):
+                if key in body and key != 'password':
+                    attributes.append({'Name': 'custom:{}'.format(key), 'Value': body[key]})
+
             _cognito_client.admin_create_user(
                 UserPoolId=self.user_pool_id(),
                 Username=self.id,
                 TemporaryPassword=body['password'],
-                UserAttributes=[
-                    {'Name': 'custom:{}'.format(key), 'Value': body[key]}
-                    for key in self.get_fields(primary_key=False)
-                    if key in body and key != 'password'
-                ],
+                UserAttributes=attributes,
                 MessageAction='SUPPRESS',
             )
             self._exists = True
