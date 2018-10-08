@@ -1,10 +1,11 @@
 from flask import request
 from functools import wraps
 from jose import jwk, jwt
-from jose.utils import base64url_decode
+from jose.exceptions import JWTError
 from werkzeug.routing import BaseConverter, ValidationError
 import datetime
 import json
+import re
 import urllib.request
 
 from .exceptions import UnauthorizedException, InvalidSchemaException, ForbiddenException
@@ -133,27 +134,28 @@ class require:
 def _authenticate_jwt(raw_token):
 
     try:
-        token = jwt.get_unverified_claims(raw_token)
-        public_key = _get_rs256_public_key(raw_token)
+        algorithm = jwt.get_unverified_header(raw_token)['alg']
+        if algorithm == 'RS256':
+            # RS256 asymmetric key validation
+            public_key = _get_rs256_public_key(raw_token)
 
-        message, encoded_signature = str(raw_token).rsplit('.', 1)
-        decoded_signature = base64url_decode(encoded_signature.encode('utf-8'))
+            claims = jwt.decode(raw_token, public_key, algorithms='RS256', options={'verify_aud': False})
 
-        if not public_key.verify(message.encode("utf8"), decoded_signature):
-            raise UnauthorizedException('Signature verification failed')
-
-        print({'jwt_token': token})
+        else:
+            raise UnauthorizedException(f'Unsupported JWT validation algorithm {algorithm}')
+        claims = jwt.get_unverified_claims(raw_token)
+        print({'jwt_token': claims})
 
         for field in ['cognito:username', 'username', 'sub']:
-            if field in token:
-                principal_id = token[field]
+            if field in claims:
+                principal_id = claims[field]
                 break
         else:
             raise UnauthorizedException('No principal id in token')
 
-        if 'exp' not in token:
+        if 'exp' not in claims:
             raise UnauthorizedException('No expiry time in token')
-        expiry_date = datetime.datetime.fromtimestamp(token['exp'])
+        expiry_date = datetime.datetime.fromtimestamp(claims['exp'])
         now = datetime.datetime.utcnow()
         if expiry_date < now:
             raise UnauthorizedException(f'Token has expired: {expiry_date.isoformat()} < {now.isoformat()}')
@@ -162,6 +164,8 @@ def _authenticate_jwt(raw_token):
 
     except UnauthorizedException:
         raise
+    except JWTError as e:
+        raise UnauthorizedException(str(e))
     except Exception:
         raise UnauthorizedException('JWT token verification failed')
 
@@ -173,14 +177,19 @@ def _get_rs256_public_key(raw_token):
     key_id = jwt.get_unverified_header(raw_token)['kid']
 
     if key_id not in cognito_keys_cache:
-        token = jwt.get_unverified_claims(raw_token)
-        cognito_userpool_id = token['iss'].split('/')[-1]
-        cognito_keys_url = f'https://cognito-idp.{Config.get("AWS_DEFAULT_REGION")}.amazonaws.com/{cognito_userpool_id}/.well-known/jwks.json'
-        print(f'Loading new keys from {cognito_keys_url}')
-        keys = json.loads(urllib.request.urlopen(cognito_keys_url).read())
+        if re.match('^jwt_\d+$', key_id):
+            print('Loading local keys')
+            with open('fathom.jwks', 'r') as f:
+                keys = json.load(f)
+        else:
+            token = jwt.get_unverified_claims(raw_token)
+            cognito_userpool_id = token['iss'].split('/')[-1]
+            cognito_keys_url = f'https://cognito-idp.{Config.get("AWS_DEFAULT_REGION")}.amazonaws.com/{cognito_userpool_id}/.well-known/jwks.json'
+            print(f'Loading new keys from {cognito_keys_url}')
+            keys = json.loads(urllib.request.urlopen(cognito_keys_url).read())
         cognito_keys_cache.update({k['kid']: k for k in keys['keys']})
 
     if key_id not in cognito_keys_cache:
         raise UnauthorizedException('Unknown signing key')
 
-    return jwk.construct(cognito_keys_cache[key_id])
+    return cognito_keys_cache[key_id]
