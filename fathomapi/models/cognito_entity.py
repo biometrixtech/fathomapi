@@ -108,10 +108,13 @@ class CognitoEntity(Entity):
         self.validate('PUT', body)
 
         try:
-            attributes = [{'Name': 'email_verified', 'Value': True}]
+            attributes = [
+                {'Name': 'email', 'Value': body['personal_data']['email']},
+                {'Name': 'email_verified', 'Value': 'true'}
+            ]
             for key in self.get_fields(primary_key=False):
                 if key in body and key != 'password':
-                    attributes.append({'Name': 'custom:{}'.format(key), 'Value': body[key]})
+                    attributes.append({'Name': 'custom:{}'.format(key), 'Value': str(body[key])})
 
             _cognito_client.admin_create_user(
                 UserPoolId=self.user_pool_id(),
@@ -134,10 +137,12 @@ class CognitoEntity(Entity):
             if 'InvalidPasswordException' in str(e):
                 raise InvalidPasswordFormatException('Password does not meet security requirements')
             else:
-                print(json.dumps({'exception': str(e)}))
                 raise
-        except ParamValidationError:
-            raise InvalidPasswordFormatException('Password does not meet security requirements')
+        except ParamValidationError as e:
+            if 'Invalid length for parameter TemporaryPassword' in str(e):
+                raise InvalidPasswordFormatException('Password is too short')
+            else:
+                raise
 
     def delete(self):
         try:
