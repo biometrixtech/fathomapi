@@ -47,6 +47,14 @@ class Service:
         return invoke_lambda_sync(f'{self.name}-{{ENVIRONMENT}}-{function_name}', self.version, payload)
 
 
+_service_token = None
+_service_token_expiry = None
+
+
 @xray_recorder.capture('fathomapi.comms.service._get_service_token')
 def _get_service_token():
-    return invoke_lambda_sync('users-{ENVIRONMENT}-apigateway-serviceauth', '2_0')['token']
+    global _service_token, _service_token_expiry
+    if _service_token is None or _service_token_expiry < datetime.datetime.now():
+        _service_token = invoke_lambda_sync('users-{ENVIRONMENT}-apigateway-serviceauth', '2_0')['token']
+        _service_token_expiry = datetime.datetime.now() + datetime.timedelta(minutes=10)
+    return _service_token
