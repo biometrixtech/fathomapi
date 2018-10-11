@@ -126,10 +126,16 @@ class Entity:
                 self._exists = False
         return self._exists
 
-    def get(self):
+    def get(self, include_internal_properties=False):
         if self._attributes is None:
             self._hydrate(self._fetch())
-        return unflatten({**self._attributes, **self.primary_key})
+
+        if include_internal_properties:
+            attributes = self._attributes
+        else:
+            attributes = {k: v for k, v in self._attributes.items() if k[0] != '_'}
+
+        return unflatten({**attributes, **self.primary_key})
 
     def _hydrate(self, fetch_result):
         self._attributes = {}

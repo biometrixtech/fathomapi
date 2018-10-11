@@ -30,8 +30,8 @@ class CognitoEntity(Entity):
             self._fetch()
         return self._id
 
-    def get(self):
-        ret = super().get()
+    def get(self, include_internal_properties=False):
+        ret = super().get(include_internal_properties)
         ret['id'] = self._id
         return ret
 
@@ -83,10 +83,11 @@ class CognitoEntity(Entity):
         attributes_to_delete = []
         for key in fields:
             if key in body:
+                param_name = key if key in ['email_verified'] else f'custom:{key}'
                 if body[key] is None:
-                    attributes_to_delete.append('custom:{}'.format(key))
+                    attributes_to_delete.append(param_name)
                 else:
-                    attributes_to_update.append({'Name': 'custom:{}'.format(key), 'Value': str(body[key])})
+                    attributes_to_update.append({'Name': param_name, 'Value': str(body[key])})
 
         if self.exists():
             _cognito_client.admin_update_user_attributes(
