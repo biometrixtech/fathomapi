@@ -1,7 +1,7 @@
 import collections
 import os
 
-from ..comms._transport import get_secretsmanager_secret
+from ..comms.transport import get_secretsmanager_secret
 
 
 class Config(collections.Mapping):

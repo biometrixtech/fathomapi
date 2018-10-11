@@ -3,7 +3,7 @@ from flask import request
 import datetime
 import json
 
-from ._transport import invoke_lambda_sync, invoke_apigateway_sync, push_sqs_sync
+from .transport import invoke_lambda_sync, invoke_apigateway_sync, push_sqs_sync
 from ..utils.formatters import format_datetime
 
 

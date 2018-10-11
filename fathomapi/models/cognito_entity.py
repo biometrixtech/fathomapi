@@ -76,9 +76,12 @@ class CognitoEntity(Entity):
 
     def patch(self, body):
         self.validate('PATCH', body)
+        self._patch(self.get_fields(immutable=False, primary_key=False), body)
+
+    def _patch(self, fields, body):
         attributes_to_update = []
         attributes_to_delete = []
-        for key in self.get_fields(immutable=False, primary_key=False):
+        for key in fields:
             if key in body:
                 if body[key] is None:
                     attributes_to_delete.append('custom:{}'.format(key))
@@ -108,21 +111,20 @@ class CognitoEntity(Entity):
         self.validate('PUT', body)
 
         try:
-            attributes = [
-                {'Name': 'email', 'Value': body['personal_data']['email']},
-                {'Name': 'email_verified', 'Value': 'true'}
-            ]
+            params = {
+                'UserPoolId': self.user_pool_id(),
+                'Username': self.id,
+                'TemporaryPassword': body['password'],
+                'UserAttributes': [{'Name': 'email', 'Value': body['personal_data']['email']}],
+                'MessageAction': 'SUPPRESS',
+            }
+
             for key in self.get_fields(primary_key=False):
                 if key in body and key != 'password':
-                    attributes.append({'Name': 'custom:{}'.format(key), 'Value': str(body[key])})
+                    param_name = key if key in ['email_verified'] else 'custom:{}'.format(key)
+                    params['UserAttributes'].append({'Name': param_name, 'Value': body[key]})
 
-            _cognito_client.admin_create_user(
-                UserPoolId=self.user_pool_id(),
-                Username=self.id,
-                TemporaryPassword=body['password'],
-                UserAttributes=attributes,
-                MessageAction='SUPPRESS',
-            )
+            _cognito_client.admin_create_user(**params)
             self._exists = True
 
             # Log in straight away so there's no risk of the Cognito user expiring

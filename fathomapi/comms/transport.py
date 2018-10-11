@@ -9,6 +9,7 @@ import os
 from ..utils.exceptions import ApplicationException
 
 _lambda_client = boto3.client('lambda')
+_ses_client = boto3.client('ses')
 _sqs_client = boto3.client('sqs')
 
 
@@ -60,6 +61,20 @@ def push_sqs_sync(queue_name, payload, execute_at):
         QueueUrl=f'https://sqs.{{AWS_REGION}}.amazonaws.com/{{AWS_ACCOUNT_ID}}/{queue_name}'.format(**os.environ),
         MessageBody=json.dumps(payload),
         DelaySeconds=max(0, min(int((execute_at - datetime.datetime.now()).total_seconds()), 15*60)),
+    )
+
+
+@xray_recorder.capture('fathomapi.comms._transport.push_sqs_sync')
+def send_ses_email(recipient, subject, text, source='noreply@fathomai.com'):
+    _ses_client.send_email(
+        Source=source,
+        Destination={'ToAddresses': [recipient]},
+        Message={
+            'Subject': {'Data': subject},
+            'Body': {
+                'Text': {'Data': text},
+            },
+        }
     )
 
 
