@@ -30,7 +30,7 @@ class Config(collections.Mapping):
 
     @classmethod
     def _load_from_secretsmanager(cls, key):
-        secret_name = '/'.join([cls.get('SERVICE'), cls.get('ENVIRONMENT'), key])
+        secret_name = '/'.join([cls.get('SERVICE'), cls.get('ENVIRONMENT'), key]).lower()
         return get_secretsmanager_secret(secret_name)
 
     def __iter__(self):
