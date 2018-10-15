@@ -6,90 +6,20 @@
 #
 # Remaining code Copyright Melon Software Ltd, used under license
 
-from flask import Flask, Response, jsonify
-from io import StringIO
-from urllib.parse import urlencode
-from werkzeug.wrappers import BaseRequest
+from flask import Flask, request, Response, jsonify
 import json
 import sys
 import traceback
 
-from .converters import UuidConverter
 from ..utils.exceptions import ApplicationException
 from ..utils.serialisable import json_serialise
-
-
-class LambdaResponse(object):
-    def __init__(self):
-        self.status = None
-        self.response_headers = None
-
-    def start_response(self, status, response_headers, exc_info=None):
-        self.status = int(status[:3])
-        self.response_headers = dict(response_headers)
+from ..utils.xray import xray_recorder, TraceHeader
+from .config import Config
+from .converters import UuidConverter
 
 
 class FlaskLambda(Flask):
-    def __call__(self, event, context):
-        if 'httpMethod' not in event:
-            # In this "context" `event` is `environ` and
-            # `context` is `start_response`, meaning the request didn't
-            # occur via API Gateway and Lambda
-            return super(FlaskLambda, self).__call__(event, context)
-
-        response = LambdaResponse()
-
-        body = next(self.wsgi_app(
-            self._make_environ(event),
-            response.start_response
-        ))
-
-        return {
-            'statusCode': response.status,
-            'headers': response.response_headers,
-            'body': body
-        }
-
-    @staticmethod
-    def _make_environ(event):
-        environ = {
-            'HOST': 'apigateway:443',
-            'HTTP_HOST': 'apigateway:443',
-            'HTTP_X_FORWARDED_PORT': '443',
-            'SCRIPT_NAME': '',
-            'SERVER_PORT': '443',
-            'SERVER_PROTOCOL': 'HTTP/1.1',
-        }
-
-        for header_name, header_value in event['headers'].items():
-            header_name = header_name.replace('-', '_').upper()
-            if header_name in ['CONTENT_TYPE', 'CONTENT_LENGTH']:
-                environ[header_name] = header_value
-            else:
-                environ[('HTTP_%s' % header_name)] = header_value
-
-        qs = event.get('queryStringParameters', None)
-
-        environ['REQUEST_METHOD'] = event['httpMethod']
-        environ['PATH_INFO'] = event['pathParameters']['endpoint']
-        environ['QUERY_STRING'] = urlencode(qs) if qs else ''
-        environ['REMOTE_ADDR'] = event.get('requestContext', {}).get('identity', {}).get('sourceIp', '0.0.0.0')
-
-        environ['CONTENT_LENGTH'] = str(
-            len(event['body']) if event['body'] else ''
-        )
-
-        environ['wsgi.url_scheme'] = 'https'
-        environ['wsgi.input'] = StringIO(event['body'] or '')
-        environ['wsgi.version'] = (1, 0)
-        environ['wsgi.errors'] = sys.stderr
-        environ['wsgi.multithread'] = False
-        environ['wsgi.run_once'] = True
-        environ['wsgi.multiprocess'] = False
-
-        BaseRequest(environ)
-
-        return environ
+    pass
 
 
 class ApiResponse(Response):
@@ -106,6 +36,37 @@ app = FlaskLambda(__name__)
 app.response_class = ApiResponse
 app.url_map.strict_slashes = False
 app.url_map.converters['uuid'] = UuidConverter
+
+
+@app.before_request
+def before_request():
+    # Pass tracing info to X-Ray
+    xray_trace_name = f"{Config.get('SERVICE')}.{Config.get('ENVIRONMENT')}.fathomai.com"
+    if 'X-Amzn-Trace-Id-Safe' in request.headers:
+        xray_trace = TraceHeader.from_header_str(request.headers['X-Amzn-Trace-Id-Safe'])
+        xray_recorder.begin_segment(
+            name=xray_trace_name,
+            traceid=xray_trace.root,
+            parent_id=xray_trace.parent
+        )
+    else:
+        xray_recorder.begin_segment(name=xray_trace_name)
+
+    xray_recorder.current_segment().put_http_meta('url', request.url)
+    xray_recorder.current_segment().put_http_meta('method', request.method)
+    xray_recorder.current_segment().put_http_meta('user_agent', request.headers['User-Agent'])
+    xray_recorder.current_segment().put_annotation('environment', Config.get('ENVIRONMENT'))
+    xray_recorder.current_segment().put_annotation('version', str(Config.get('API_VERSION')))
+
+
+@app.after_request
+def after_request(response):
+    status = int(response.status[:3])
+    xray_recorder.current_segment().put_http_meta('status', status)
+    xray_recorder.current_segment().apply_status_code(status)
+    xray_recorder.end_segment()
+
+    return response
 
 
 @app.errorhandler(500)
