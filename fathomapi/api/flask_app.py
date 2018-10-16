@@ -41,7 +41,11 @@ app.url_map.converters['uuid'] = UuidConverter
 @app.before_request
 def before_request():
     # Pass tracing info to X-Ray
-    xray_trace_name = f"{Config.get('SERVICE')}.{Config.get('ENVIRONMENT')}.fathomai.com"
+    service = Config.get('SERVICE')
+    environment = Config.get('ENVIRONMENT')
+    version = str(Config.get('API_VERSION'))
+
+    xray_trace_name = f"{service}.{environment}.fathomai.com"
     if 'X-Amzn-Trace-Id-Safe' in request.headers:
         xray_trace = TraceHeader.from_header_str(request.headers['X-Amzn-Trace-Id-Safe'])
         xray_recorder.begin_segment(
@@ -52,11 +56,11 @@ def before_request():
     else:
         xray_recorder.begin_segment(name=xray_trace_name)
 
-    xray_recorder.current_segment().put_http_meta('url', request.url)
+    xray_recorder.current_segment().put_http_meta('url', f'{request.host_url}/{service}/{version}/{request.full_path}')
     xray_recorder.current_segment().put_http_meta('method', request.method)
     xray_recorder.current_segment().put_http_meta('user_agent', request.headers['User-Agent'])
-    xray_recorder.current_segment().put_annotation('environment', Config.get('ENVIRONMENT'))
-    xray_recorder.current_segment().put_annotation('version', str(Config.get('API_VERSION')))
+    xray_recorder.current_segment().put_annotation('environment', environment)
+    xray_recorder.current_segment().put_annotation('version', version)
 
 
 @app.after_request
