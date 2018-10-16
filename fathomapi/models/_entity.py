@@ -79,7 +79,7 @@ class Entity:
             # TODO validate items
             if not isinstance(value, (list, set)):
                 raise ValueError(f'{field} must be a list, not {type(value)} ({value})')
-            return list(value)
+            return [v for v in list(value) if v != '_empty']
         elif field_type == 'string':
             return str(value)
         elif field_type == 'number':

@@ -176,6 +176,7 @@ class DynamodbEntity(Entity):
             key = self._register_parameter_name(field)
             if key is not None:
                 self._add.add(f'#{key} :{key}')
+                value = set(value) if isinstance(value, list) else value
                 self._parameter_values[f':{key}'] = value
 
         def delete(self, field, value):
