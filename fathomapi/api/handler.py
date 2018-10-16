@@ -26,7 +26,6 @@ def handler(event, context):
     response = LambdaResponse()
 
     ret = app(_make_environ(event), response.start_response)
-    print(ret)
 
     body = next(ret).decode('utf-8') if int(response.headers.get('Content-Length', 0)) > 0 else ''  # Don't try to get body content if there isn't any
     ret = response.to_lambda(body)

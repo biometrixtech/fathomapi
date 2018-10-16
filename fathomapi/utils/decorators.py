@@ -7,10 +7,11 @@ import datetime
 import json
 import os
 import re
-import urllib.request
+import requests
 
 from .exceptions import UnauthorizedException, InvalidSchemaException, ForbiddenException
 from ..api.config import Config
+from ..utils.xray import xray_recorder
 
 
 # Using classes as namespaces
@@ -132,6 +133,7 @@ class require:
         return wrap
 
 
+@xray_recorder.capture('fathomapi.utils.decorators._authenticate_jwt')
 def _authenticate_jwt(raw_token):
 
     try:
@@ -174,6 +176,7 @@ def _authenticate_jwt(raw_token):
 cognito_keys_cache = {}
 
 
+@xray_recorder.capture('fathomapi.utils.decorators._get_rs256_public_key')
 def _get_rs256_public_key(raw_token):
     key_id = jwt.get_unverified_header(raw_token)['kid']
 
@@ -188,7 +191,7 @@ def _get_rs256_public_key(raw_token):
             cognito_userpool_id = token['iss'].split('/')[-1]
             cognito_keys_url = f'https://cognito-idp.{Config.get("AWS_DEFAULT_REGION")}.amazonaws.com/{cognito_userpool_id}/.well-known/jwks.json'
             print(f'Loading new keys from {cognito_keys_url}')
-            keys = json.loads(urllib.request.urlopen(cognito_keys_url).read())
+            keys = requests.get(cognito_keys_url).json()
         cognito_keys_cache.update({k['kid']: k for k in keys['keys']})
 
     if key_id not in cognito_keys_cache:
