@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="fathomapi",
-    version="0.7.1",
+    version="0.8.0",
     author="Stephen Poole",
     author_email="stephen@melon.software",
     description="A library and toolkit for running microservice APIs in AWS Lambda",
@@ -21,7 +21,8 @@ setuptools.setup(
     install_requires=[
         'aws-xray-sdk>=0.95',
         'Flask>=1.0.2',
-        'python-jose>=3.0.0'
+        'python-jose>=3.0.0',
+        'semver==2.8.1',
     ],
     package_data={'fathomapi': ['utils/fathom.jwks']}
 )

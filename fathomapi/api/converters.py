@@ -1,3 +1,4 @@
+from semver import VersionInfo
 from werkzeug.routing import BaseConverter, ValidationError
 import uuid
 
@@ -12,6 +13,19 @@ class UuidConverter(BaseConverter):
         return value
 
     type_name = 'uuid'
+
+
+class VersionNumberConverter(BaseConverter):
+    def to_python(self, value):
+        try:
+            if value.lower() == 'latest':
+                return 'latest'
+            return VersionInfo.parse(value)
+        except Exception:
+            raise ValidationError('Version number must be a semantic version')
+
+    def to_url(self, value):
+        return str(value)
 
 
 def _validate_uuid4(uuid_string):
