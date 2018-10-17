@@ -57,7 +57,7 @@ def before_request():
     else:
         xray_recorder.begin_segment(name=xray_trace_name)
 
-    xray_recorder.current_segment().put_http_meta('url', f'{request.host_url}/{service}/{version}{request.full_path}'.rstrip('?'))
+    xray_recorder.current_segment().put_http_meta('url', f'{request.host_url}{service}/{version}{request.full_path}'.rstrip('?'))
     xray_recorder.current_segment().put_http_meta('method', request.method)
     xray_recorder.current_segment().put_http_meta('user_agent', request.headers['User-Agent'])
     xray_recorder.current_segment().put_annotation('environment', environment)
