@@ -15,7 +15,7 @@ from ..utils.exceptions import ApplicationException
 from ..utils.serialisable import json_serialise
 from ..utils.xray import xray_recorder, TraceHeader
 from .config import Config
-from .converters import UuidConverter
+from .converters import UuidConverter, VersionNumberConverter
 
 
 class FlaskLambda(Flask):
@@ -36,6 +36,7 @@ app = FlaskLambda(__name__)
 app.response_class = ApiResponse
 app.url_map.strict_slashes = False
 app.url_map.converters['uuid'] = UuidConverter
+app.url_map.converters['semver'] = VersionNumberConverter
 
 
 @app.before_request
