@@ -185,14 +185,16 @@ def _get_rs256_public_key(raw_token):
             path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fathom.jwks')
             print(f'Loading local keys from {path}')
             with open(path, 'r') as f:
-                keys = json.load(f)
+                keys = json.load(f)['keys']
+                # Include only keys for this environment
+                keys = filter(lambda k: Config.get('ENVIRONMENT') in k['_environments'], keys)
         else:
             token = jwt.get_unverified_claims(raw_token)
             cognito_userpool_id = token['iss'].split('/')[-1]
             cognito_keys_url = f'https://cognito-idp.{Config.get("AWS_DEFAULT_REGION")}.amazonaws.com/{cognito_userpool_id}/.well-known/jwks.json'
             print(f'Loading new keys from {cognito_keys_url}')
-            keys = requests.get(cognito_keys_url).json()
-        cognito_keys_cache.update({k['kid']: k for k in keys['keys']})
+            keys = requests.get(cognito_keys_url).json()['keys']
+        cognito_keys_cache.update({k['kid']: k for k in keys})
 
     if key_id not in cognito_keys_cache:
         raise UnauthorizedException('Unknown signing key')
