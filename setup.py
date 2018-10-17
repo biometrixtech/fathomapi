@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="fathomapi",
-    version="0.8.2",
+    version="0.8.3",
     author="Stephen Poole",
     author_email="stephen@melon.software",
     description="A library and toolkit for running microservice APIs in AWS Lambda",
