@@ -41,7 +41,7 @@ def invoke_apigateway_sync(service, version, method, endpoint, body=None, header
     :param dict headers:
     :return:
     """
-    url = f"http://apis.{os.environ['ENVIRONMENT']}.fathomai.com/{service}/{version}/{endpoint}"
+    url = f"https://apis.{os.environ['ENVIRONMENT']}.fathomai.com/{service}/{version}/{endpoint}"
 
     all_headers = {
         'Content-Type': 'application/json',
