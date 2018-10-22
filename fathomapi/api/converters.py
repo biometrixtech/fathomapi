@@ -5,8 +5,8 @@ import uuid
 
 class UuidConverter(BaseConverter):
     def to_python(self, value):
-        if _validate_uuid4(str(value)):
-            return value
+        if _validate_uuid(str(value), 4) or _validate_uuid(str(value), 5):
+            return value.lower()
         raise ValidationError()
 
     def to_url(self, value):
@@ -28,9 +28,9 @@ class VersionNumberConverter(BaseConverter):
         return str(value)
 
 
-def _validate_uuid4(uuid_string):
+def _validate_uuid(uuid_string, version):
     try:
-        val = uuid.UUID(uuid_string, version=4)
+        val = uuid.UUID(uuid_string, version=version)
         # If the uuid_string is a valid hex code, but an invalid uuid4, the UUID.__init__
         # will convert it to a valid uuid4. This is bad for validation purposes.
         return val.hex == uuid_string.replace('-', '')

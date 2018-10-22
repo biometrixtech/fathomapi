@@ -62,6 +62,7 @@ def before_request():
     xray_recorder.current_segment().put_http_meta('user_agent', request.headers['User-Agent'])
     xray_recorder.current_segment().put_annotation('environment', environment)
     xray_recorder.current_segment().put_annotation('version', version)
+    xray_recorder.current_segment().put_annotation('code_version', _get_code_version())
 
 
 @app.after_request
@@ -105,3 +106,14 @@ def handle_unrecognised_method(_):
 def handle_application_exception(e):
     traceback.print_exception(*sys.exc_info())
     return {'message': e.message}, e.status_code, {'Status': e.status_code_text}
+
+
+def _get_code_version():
+    try:
+        with open('version', 'r') as f:
+            return f.read()
+    except FileNotFoundError:
+        return '0' * 40
+    except Exception as e:
+        print(e)
+        return '???'

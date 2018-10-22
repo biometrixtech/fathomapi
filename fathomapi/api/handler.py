@@ -4,7 +4,6 @@ from werkzeug.wrappers import BaseRequest
 import json
 import sys
 
-from ..utils.xray import xray_recorder, TraceHeader
 from .config import Config
 from .flask_app import app
 
