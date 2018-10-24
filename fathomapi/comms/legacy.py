@@ -1,7 +1,7 @@
-from aws_xray_sdk.core import xray_recorder
 import os
 
 from .transport import invoke_lambda_sync
+from ..utils.xray import xray_recorder
 
 
 @xray_recorder.capture('fathomapi.comms.legacy.query_postgres')

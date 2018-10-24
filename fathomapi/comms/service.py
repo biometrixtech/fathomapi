@@ -1,10 +1,9 @@
-from aws_xray_sdk.core import xray_recorder
-from flask import request
 import datetime
 import json
 
 from .transport import invoke_lambda_sync, invoke_apigateway_sync, push_sqs_sync
 from ..utils.formatters import format_datetime
+from ..utils.xray import xray_recorder
 
 
 class Service:

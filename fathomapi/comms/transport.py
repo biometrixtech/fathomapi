@@ -1,4 +1,3 @@
-from aws_xray_sdk.core import xray_recorder
 from botocore.exceptions import ClientError
 import boto3
 import datetime
@@ -7,6 +6,7 @@ import requests
 import os
 
 from ..utils.exceptions import ApplicationException
+from ..utils.xray import xray_recorder
 
 _lambda_client = boto3.client('lambda')
 _ses_client = boto3.client('ses')
