@@ -49,28 +49,25 @@ def before_request():
     xray_trace_name = f"{service}.{environment}.fathomai.com"
     if 'X-Amzn-Trace-Id-Safe' in request.headers:
         xray_trace = TraceHeader.from_header_str(request.headers['X-Amzn-Trace-Id-Safe'])
-        xray_recorder.begin_segment(
+        xray_recorder.begin_subsegment(
             name=xray_trace_name,
             traceid=xray_trace.root,
             parent_id=xray_trace.parent
         )
     else:
-        xray_recorder.begin_segment(name=xray_trace_name)
+        xray_recorder.begin_subsegment(name=xray_trace_name)
 
-    xray_recorder.current_segment().put_http_meta('url', f'{request.host_url}{service}/{version}{request.full_path}'.rstrip('?'))
-    xray_recorder.current_segment().put_http_meta('method', request.method)
-    xray_recorder.current_segment().put_http_meta('user_agent', request.headers['User-Agent'])
-    xray_recorder.current_segment().put_annotation('environment', environment)
-    xray_recorder.current_segment().put_annotation('version', version)
-    xray_recorder.current_segment().put_annotation('code_version', _get_code_version())
+    xray_recorder.current_subsegment().put_annotation('environment', environment)
+    xray_recorder.current_subsegment().put_annotation('version', version)
+    xray_recorder.current_subsegment().put_annotation('code_version', _get_code_version())
 
 
 @app.after_request
 def after_request(response):
     status = int(response.status[:3])
-    xray_recorder.current_segment().put_http_meta('status', status)
-    xray_recorder.current_segment().apply_status_code(status)
-    xray_recorder.end_segment()
+    xray_recorder.current_subsegment().put_http_meta('status', status)
+    xray_recorder.current_subsegment().apply_status_code(status)
+    xray_recorder.end_subsegment()
 
     return response
 
