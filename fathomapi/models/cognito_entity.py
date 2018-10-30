@@ -4,6 +4,7 @@ from botocore.exceptions import ClientError, ParamValidationError
 import boto3
 import datetime
 import json
+import math
 
 from fathomapi.utils.exceptions import NoSuchEntityException, DuplicateEntityException, InvalidPasswordFormatException, UnauthorizedException
 
@@ -36,8 +37,8 @@ class CognitoEntity(Entity):
         return ret
 
     @classmethod
-    def get_many(cls, next_token=None, **kwargs):
-        args = {'UserPoolId': cls.user_pool_id(), 'Limit': 60}
+    def get_many(cls, next_token=None, max_items=math.inf, **kwargs):
+        args = {'UserPoolId': cls.user_pool_id(), 'Limit': min(max_items, 60)}
         if len(kwargs) == 1:
             raise NotImplementedError
         elif len(kwargs) > 1:
@@ -55,10 +56,13 @@ class CognitoEntity(Entity):
             obj._id = user['Username']
             ret.append(obj)
 
-        if 'PaginationToken' in res:
-            ret += cls.get_many(res['PaginationToken'], **kwargs)
+        next_next_token = res.get('PaginationToken', None)
 
-        return ret
+        if next_next_token is not None and len(ret) < max_items:
+            ret2, next_next_token = cls.get_many(next_token=next_next_token, max_items=max_items - len(ret), **kwargs)
+            ret += ret2
+
+        return ret, next_next_token
 
     def _fetch(self):
         try:

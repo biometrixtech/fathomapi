@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from botocore.exceptions import ClientError
 import boto3
+import math
 
 from ._entity import Entity
 from ..utils.exceptions import NoSuchEntityException
@@ -42,13 +43,12 @@ class IotEntity(Entity):
         raise NotImplementedError
 
     @classmethod
-    def get_many(cls, next_token=None, **kwargs):
-        if len(kwargs) == 0:
-            args = {}
-        elif len(kwargs) == 1:
+    def get_many(cls, next_token=None, max_items=math.inf, **kwargs):
+        args = {'maxResults': min(max_items, 100)}
+        if len(kwargs) == 1:
             key, value = next(iter(kwargs.items()))
             args = {'attributeName': key, 'attributeValue': value}
-        else:
+        elif len(kwargs) > 1:
             raise Exception('IoTEntity can only be filtered on one property')
 
         if next_token is not None:
@@ -62,7 +62,10 @@ class IotEntity(Entity):
             obj._hydrate(thing['attributes'])
             ret.append(obj)
 
-        if 'nextToken' in res:
-            ret += cls.get_many(res['nextToken'], **kwargs)
+        next_next_token = res.get('nextToken', None)
 
-        return ret
+        if next_next_token is not None and len(ret) < max_items:
+            ret2, next_next_token = cls.get_many(next_token=next_next_token, max_items=max_items - len(ret), **kwargs)
+            ret += ret2
+
+        return ret, next_next_token

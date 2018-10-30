@@ -19,29 +19,37 @@ class Service:
 
         return invoke_apigateway_sync(self.name, self.version, method, endpoint, body, headers)
 
+    @xray_recorder.capture('fathomapi.comms.service.call_apigateway_async')
     def call_apigateway_async(self, method, endpoint, body=None, execute_at=None):
+        return self.call_apigateway_async([{'method': method, 'endpoint': endpoint, 'body': body}], execute_at)
+
+    @xray_recorder.capture('fathomapi.comms.service.call_apigateway_async_multi')
+    def call_apigateway_async_multi(self, calls, execute_at=None):
         if execute_at is None:
             execute_at = datetime.datetime.now()
-        endpoint = endpoint.strip('/')
-        payload = {
-            "path": f"/{self.name}/{self.version}/{endpoint}",
-            "httpMethod": method,
+        service_token = _get_service_token()
+
+        payloads = [{
+            "path": f"/{self.name}/{self.version}/{call['endpoint'].strip('/')}",
+            "httpMethod": call['method'],
             "headers": {
                 "Accept": "*/*",
-                "Authorization": _get_service_token(),
+                "Authorization": service_token,
                 "Content-Type": "application/json",
                 "User-Agent": f"Biometrix/API {self.name}:{self.version}",
                 "X-Execute-At": format_datetime(execute_at),
                 "X-Api-Version": self.version,
             },
-            "pathParameters": {"endpoint": endpoint},
+            "pathParameters": {"endpoint": call['endpoint'].strip('/')},
             "stageVariables": {"LambdaAlias": self.version},
-            "body": json.dumps(body) if body is not None else None,
+            "body": json.dumps(call['body']) if call['body'] is not None else None,
             "isBase64Encoded": False
-        }
+        } for call in calls]
 
-        push_sqs_sync(f'{self.name}-{{ENVIRONMENT}}-apigateway-async', payload, execute_at)
+        for i in range(0, len(payloads), 10):
+            push_sqs_sync(f'{self.name}-{{ENVIRONMENT}}-apigateway-async', payloads[i:i+10], execute_at)
 
+    @xray_recorder.capture('fathomapi.comms.service.call_lambda_sync')
     def call_lambda_sync(self, function_name, payload=None):
         return invoke_lambda_sync(f'{self.name}-{{ENVIRONMENT}}-{function_name}', self.version, payload)
 

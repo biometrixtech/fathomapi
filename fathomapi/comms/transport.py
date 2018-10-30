@@ -1,4 +1,5 @@
 from botocore.exceptions import ClientError
+import binascii
 import boto3
 import datetime
 import json
@@ -56,11 +57,15 @@ def invoke_apigateway_sync(service, version, method, endpoint, body=None, header
 
 
 @xray_recorder.capture('fathomapi.comms._transport.push_sqs_sync')
-def push_sqs_sync(queue_name, payload, execute_at):
-    _sqs_client.send_message(
+def push_sqs_sync(queue_name, payloads, execute_at):
+    delay_seconds = max(0, min(int((execute_at - datetime.datetime.now()).total_seconds()), 15*60))
+    _sqs_client.send_message_batch(
         QueueUrl=f'https://sqs.{{AWS_REGION}}.amazonaws.com/{{AWS_ACCOUNT_ID}}/{queue_name}'.format(**os.environ),
-        MessageBody=json.dumps(payload),
-        DelaySeconds=max(0, min(int((execute_at - datetime.datetime.now()).total_seconds()), 15*60)),
+        Entries=[{
+            'MessageBody': json.dumps(payload),
+            'DelaySeconds': delay_seconds,
+            'Id': binascii.b2a_hex(os.urandom(16)).decode(),
+        } for payload in payloads]
     )
 
 
