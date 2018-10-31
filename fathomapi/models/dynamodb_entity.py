@@ -19,6 +19,10 @@ _dynamodb_client = boto3.client('dynamodb')
 class DynamodbEntity(Entity):
     _dynamodb_table_name = None
 
+    def __init__(self, primary_key):
+        super().__init__(primary_key)
+        self._index = None
+
     @classmethod
     def get_many(cls, **kwargs):
         if len(kwargs) == 1:
@@ -63,7 +67,7 @@ class DynamodbEntity(Entity):
     def _fetch(self):
         # And together all the elements of the primary key
         kcx = reduce(iand, [Key(k).eq(v) for k, v in self.primary_key.items()])
-        res = self._query_dynamodb(kcx)
+        res = self._query_dynamodb(kcx, index=self._index)
 
         if len(res) == 0:
             raise NoSuchEntityException()
@@ -149,23 +153,20 @@ class DynamodbEntity(Entity):
     def _get_dynamodb_resource(cls):
         return boto3.resource('dynamodb').Table(cls._dynamodb_table_name)
 
-    def _query_dynamodb(self, key_condition_expression, limit=10000, scan_index_forward=True, exclusive_start_key=None):
-        self._print_condition_expression(key_condition_expression, True)
+    def _query_dynamodb(self, key_condition_expression, limit=10000, scan_index_forward=True, exclusive_start_key=None, index=None):
+        args = {
+            'Select': 'ALL_ATTRIBUTES',
+            'Limit': limit,
+            'KeyConditionExpression': key_condition_expression,
+            'ScanIndexForward': scan_index_forward,
+        }
         if exclusive_start_key is not None:
-            ret = self._get_dynamodb_resource().query(
-                Select='ALL_ATTRIBUTES',
-                Limit=limit,
-                KeyConditionExpression=key_condition_expression,
-                ExclusiveStartKey=exclusive_start_key,
-                ScanIndexForward=scan_index_forward,
-            )
-        else:
-            ret = self._get_dynamodb_resource().query(
-                Select='ALL_ATTRIBUTES',
-                Limit=limit,
-                KeyConditionExpression=key_condition_expression,
-                ScanIndexForward=scan_index_forward,
-            )
+            args['ExclusiveStartKey'] = exclusive_start_key
+        if index is not None:
+            args['IndexName'] = index
+
+        ret = self._get_dynamodb_resource().query(**args)
+
         if 'LastEvaluatedKey' in ret:
             # There are more records to be scanned
             return ret['Items'] + self._query_dynamodb(key_condition_expression, limit, scan_index_forward, ret['LastEvaluatedKey'])
@@ -257,4 +258,3 @@ class DynamodbEntity(Entity):
                 'parameter_names': self.parameter_names,
                 'parameter_values': self.parameter_values,
             })
-
