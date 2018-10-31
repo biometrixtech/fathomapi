@@ -106,7 +106,7 @@ class CognitoEntity(Entity):
             )
         else:
             # TODO
-            raise NotImplementedError
+            raise NotImplementedError('Cannot patch, user does not exist')
 
         return self.get()
 

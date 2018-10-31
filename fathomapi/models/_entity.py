@@ -42,7 +42,8 @@ class Entity:
                     'required': field in schema.get('required', []) and required,
                     'primary_key': field in self._primary_key_fields,
                     'type': field_type,
-                    'default': config.get('default', None)
+                    'default': config.get('default', None),
+                    'pattern': config.get('pattern', None),
                 }
 
     @property
@@ -73,15 +74,19 @@ class Entity:
 
         if isinstance(field_type, set):
             if value not in field_type:
-                raise ValueError(f'{field} must be one of {field_type}, not {value}')
+                raise ValueError(f"Field '{field}' must be one of {field_type}, not {value}")
             return value
         elif isinstance(field_type, list):
             # TODO validate items
             if not isinstance(value, (list, set)):
-                raise ValueError(f'{field} must be a list, not {type(value)} ({value})')
+                raise ValueError(f"Field '{field}' must be a list, not {type(value)} ({value})")
             return [v for v in list(value) if v != '_empty']
         elif field_type == 'string':
-            return str(value)
+            value = str(value)
+            pattern = self._fields[field]['pattern']
+            if pattern is not None and not re.match(pattern, value):
+                raise ValueError(f"Field '{field}' value ({value}) must match the regular expression /{pattern}/")
+            return value
         elif field_type == 'number':
             return Decimal(str(value))
         elif field_type == 'bool':
@@ -89,7 +94,7 @@ class Entity:
         elif field_type == "types.json/definitions/macaddress":
             return str(value).upper()
         else:
-            raise NotImplementedError("field_type '{}' cannot be cast".format(field_type))
+            raise NotImplementedError(f"field_type '{field_type}' cannot be cast")
 
     def validate(self, operation: str, body: dict):
         # Primary key must be complete

@@ -21,7 +21,7 @@ class Service:
 
     @xray_recorder.capture('fathomapi.comms.service.call_apigateway_async')
     def call_apigateway_async(self, method, endpoint, body=None, execute_at=None):
-        return self.call_apigateway_async([{'method': method, 'endpoint': endpoint, 'body': body}], execute_at)
+        return self.call_apigateway_async_multi([{'method': method, 'endpoint': endpoint, 'body': body}], execute_at)
 
     @xray_recorder.capture('fathomapi.comms.service.call_apigateway_async_multi')
     def call_apigateway_async_multi(self, calls, execute_at=None):
