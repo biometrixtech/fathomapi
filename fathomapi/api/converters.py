@@ -1,5 +1,6 @@
 from semver import VersionInfo
 from werkzeug.routing import BaseConverter, ValidationError
+import re
 import uuid
 
 
@@ -22,6 +23,30 @@ class VersionNumberConverter(BaseConverter):
                 return 'latest'
             return VersionInfo.parse(value)
         except Exception:
+            raise ValidationError('Version number must be a semantic version')
+
+    def to_url(self, value):
+        return str(value)
+
+
+class Mac6AddressConverter(BaseConverter):
+    def to_python(self, value):
+        value = value.upper()
+        if re.match('^([0-9A-F]{2}:){5}[0-9A-F]{2}', value):
+            return value
+        else:
+            raise ValidationError('Version number must be a semantic version')
+
+    def to_url(self, value):
+        return str(value)
+
+
+class Mac4AddressConverter(BaseConverter):
+    def to_python(self, value):
+        value = value.upper()
+        if re.match('^([0-9A-F]{2}:){3}[0-9A-F]{2}', value):
+            return value
+        else:
             raise ValidationError('Version number must be a semantic version')
 
     def to_url(self, value):

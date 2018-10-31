@@ -15,7 +15,7 @@ from ..utils.exceptions import ApplicationException
 from ..utils.serialisable import json_serialise
 from ..utils.xray import xray_recorder, TraceHeader
 from .config import Config
-from .converters import UuidConverter, VersionNumberConverter
+from .converters import UuidConverter, VersionNumberConverter, Mac4AddressConverter, Mac6AddressConverter
 
 
 class FlaskLambda(Flask):
@@ -37,6 +37,8 @@ app.response_class = ApiResponse
 app.url_map.strict_slashes = False
 app.url_map.converters['uuid'] = UuidConverter
 app.url_map.converters['semver'] = VersionNumberConverter
+app.url_map.converters['mac4'] = Mac4AddressConverter
+app.url_map.converters['mac6'] = Mac6AddressConverter
 
 
 @app.before_request
