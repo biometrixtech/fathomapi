@@ -120,7 +120,7 @@ class DynamodbEntity(Entity):
         body = flatten(body)
 
         k = list(self.primary_key.keys())[0]
-        condition = Attr(k).exists() | Attr(k).not_exists()
+        condition = Attr(k).not_exists()
         body['created_date'] = format_datetime(datetime.datetime.now())
 
         keys = self.get_fields(immutable=None, primary_key=False)
@@ -258,3 +258,4 @@ class DynamodbEntity(Entity):
                 'parameter_names': self.parameter_names,
                 'parameter_values': self.parameter_values,
             })
+

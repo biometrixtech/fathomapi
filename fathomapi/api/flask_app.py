@@ -48,16 +48,7 @@ def before_request():
     environment = Config.get('ENVIRONMENT')
     version = str(Config.get('API_VERSION'))
 
-    xray_trace_name = f"{service}.{environment}.fathomai.com"
-    if 'X-Amzn-Trace-Id-Safe' in request.headers:
-        xray_trace = TraceHeader.from_header_str(request.headers['X-Amzn-Trace-Id-Safe'])
-        xray_recorder.begin_subsegment(
-            name=xray_trace_name,
-            traceid=xray_trace.root,
-            parent_id=xray_trace.parent
-        )
-    else:
-        xray_recorder.begin_subsegment(name=xray_trace_name)
+    xray_recorder.begin_subsegment(name=f"{service}.{environment}.fathomai.com")
 
     xray_recorder.current_subsegment().put_annotation('environment', environment)
     xray_recorder.current_subsegment().put_annotation('version', version)
