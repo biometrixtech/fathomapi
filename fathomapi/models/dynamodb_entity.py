@@ -22,6 +22,7 @@ class DynamodbEntity(Entity):
     def __init__(self, primary_key):
         super().__init__(primary_key)
         self._index = None
+        self._secondary_key = None
 
     @classmethod
     def get_many(cls, **kwargs):
@@ -66,12 +67,17 @@ class DynamodbEntity(Entity):
 
     def _fetch(self):
         # And together all the elements of the primary key
-        kcx = reduce(iand, [Key(k).eq(v) for k, v in self.primary_key.items()])
+        if self._secondary_key is not None:
+            kcx = reduce(iand, [Key(k).eq(v) for k, v in self._secondary_key.items()])
+        else:
+            kcx = reduce(iand, [Key(k).eq(v) for k, v in self.primary_key.items()])
+        print(f'primary_key={self.primary_key}, secondary_key={self._secondary_key}, index={self._index}')
         res = self._query_dynamodb(kcx, index=self._index)
 
         if len(res) == 0:
             raise NoSuchEntityException()
         print(res[0])
+        self._primary_key = {k: res[0][k] for k in self._primary_key.keys()}
         return res[0]
 
     def patch(self, body):
