@@ -135,6 +135,8 @@ class DynamodbEntity(Entity):
             if isinstance(self._fields[key]['type'], list):
                 if key in body:
                     upsert.set(key, set(body[key]).union({'_empty'}))
+                else:
+                    upsert.set(key, {'_empty'})
             elif self._fields[key]['type'] == 'number':
                 if key in body:
                     upsert.set(key, Decimal(str(body[key])))
