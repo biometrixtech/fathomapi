@@ -22,12 +22,14 @@ class Entity:
     def _load_fields(self, schema, parent='', parent_required=True):
         for field, config in schema['properties'].items():
             required = field in schema.get('required', []) and parent_required
+            default = None
             if config.get('type', None) == 'object':
                 self._load_fields(config, parent=f'{parent}{field}.', parent_required=required)
             else:
                 if 'enum' in config:
                     field_type = set(config['enum'])
                 elif config['type'] == 'array':
+                    default = []
                     if 'items' in config:
                         if isinstance(config['items'], list):
                             field_type = config['items']
@@ -42,7 +44,7 @@ class Entity:
                     'required': field in schema.get('required', []) and required,
                     'primary_key': field in self._primary_key_fields,
                     'type': field_type,
-                    'default': config.get('default', None),
+                    'default': config.get('default', default),
                     'pattern': config.get('pattern', None),
                 }
 
