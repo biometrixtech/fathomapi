@@ -80,18 +80,21 @@ class CognitoEntity(Entity):
 
     def patch(self, body):
         self.validate('PATCH', body)
-        self._patch(self.get_fields(immutable=False, primary_key=False), body)
+        return self._patch(self.get_fields(immutable=False, primary_key=False), body)
 
     def _patch(self, fields, body):
         attributes_to_update = []
         attributes_to_delete = []
+
+        body = self.flatten(body)
+
         for key in fields:
             if key in body:
                 param_name = key if key in ['email_verified'] else f'custom:{key}'
                 if body[key] is None:
                     attributes_to_delete.append(param_name)
                 else:
-                    attributes_to_update.append({'Name': param_name, 'Value': str(body[key])})
+                    attributes_to_update.append({'Name': param_name, 'Value': body[key]})
 
         if self.exists():
             _cognito_client.admin_update_user_attributes(
@@ -246,4 +249,39 @@ class CognitoEntity(Entity):
             if 'UserNotFoundException' in str(e):
                 raise NoSuchEntityException()
             raise
+
+    @classmethod
+    def flatten(cls, d, prefix=''):
+        """
+        Flatten nested dictionaries
+        :param dict d:
+        :param str prefix:
+        :return: dict
+        """
+        ret = {}
+        for key, value in d.items():
+            if isinstance(value, dict):
+                ret[f'{prefix}{key}'] = json.dumps(value)
+            else:
+                ret[f'{prefix}{key}'] = str(value)
+        print(f'flatten input={d}, output={ret}')
+        return ret
+
+    @classmethod
+    def unflatten(cls, d):
+        """
+        Unflatten nested dictionaries
+        :param dict d:
+        :return: dict
+        """
+        ret = {}
+        for key, value in d.items():
+            if value is None:
+                ret[key] = None
+            else:
+                try:
+                    ret[key] = json.loads(value)
+                except json.decoder.JSONDecodeError as e:
+                    ret[key] = value
+        return ret
 

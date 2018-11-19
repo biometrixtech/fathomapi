@@ -23,7 +23,7 @@ class Entity:
         for field, config in schema['properties'].items():
             required = field in schema.get('required', []) and parent_required
             default = None
-            if config.get('type', None) == 'object':
+            if config.get('type', None) == 'object' and 'properties' in config:
                 self._load_fields(config, parent=f'{parent}{field}.', parent_required=required)
             else:
                 if 'enum' in config:
@@ -95,6 +95,8 @@ class Entity:
             return bool(value)
         elif field_type == "types.json/definitions/macaddress":
             return str(value).upper()
+        elif field_type == 'object':
+            return value
         else:
             raise NotImplementedError(f"field_type '{field_type}' cannot be cast")
 
@@ -103,7 +105,7 @@ class Entity:
         if None in self.primary_key.values():
             raise InvalidSchemaException('Incomplete primary key')
 
-        body = flatten(body)
+        body = self.flatten(body)
 
         if operation == 'PATCH':
             # Not allowed to modify readonly attributes for PATCH
@@ -142,7 +144,7 @@ class Entity:
         else:
             attributes = {k: v for k, v in self._attributes.items() if k[0] != '_'}
 
-        return unflatten({**attributes, **self.primary_key})
+        return self.unflatten({**attributes, **self.primary_key})
 
     def _hydrate(self, fetch_result):
         self._attributes = {}
@@ -173,40 +175,39 @@ class Entity:
     def delete(self):
         raise NotImplementedError()
 
+    @classmethod
+    def flatten(cls, d, prefix=''):
+        """
+        Flatten nested dictionaries
+        :param dict d:
+        :param str prefix:
+        :return: dict
+        """
+        ret = {}
+        for key, value in d.items():
+            if isinstance(value, dict):
+                ret.update(cls.flatten(value, f'{prefix}{key}.'))
+            else:
+                ret[f'{prefix}{key}'] = value
+        return ret
 
-def flatten(d, prefix=''):
-    """
-    Flatten nested dictionaries
-    :param dict d:
-    :param str prefix:
-    :return:
-    """
-    return (reduce(
-        lambda new_d, kv:
-        isinstance(kv[1], dict) and
-        {**new_d, **flatten(kv[1], f'{prefix}{kv[0]}.')} or
-        {**new_d, f'{prefix}{kv[0]}': kv[1]},
-        d.items(),
-        {}
-    ))
-
-
-def unflatten(d):
-    """
-    Unflatten nested dictionaries
-    :param dict d:
-    :return:
-    """
-    ret = {}
-    for key, value in d.items():
-        key_parts = key.split(".")
-        d2 = ret
-        for part in key_parts[:-1]:
-            if part not in d2:
-                d2[part] = dict()
-            d2 = d2[part]
-        d2[key_parts[-1]] = value
-    return ret
+    @classmethod
+    def unflatten(cls, d):
+        """
+        Unflatten nested dictionaries
+        :param dict d:
+        :return: dict
+        """
+        ret = {}
+        for key, value in d.items():
+            key_parts = key.split(".")
+            d2 = ret
+            for part in key_parts[:-1]:
+                if part not in d2:
+                    d2[part] = dict()
+                d2 = d2[part]
+            d2[key_parts[-1]] = value
+        return ret
 
 
 def camel_to_snake(string):

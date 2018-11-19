@@ -1,4 +1,4 @@
-from ._entity import Entity, flatten
+from ._entity import Entity
 from abc import abstractmethod
 from boto3.dynamodb.conditions import Key, Attr, ConditionExpressionBuilder
 from botocore.exceptions import ClientError
@@ -87,7 +87,7 @@ class DynamodbEntity(Entity):
         :return:
         """
         self.validate('PATCH', body)
-        body = flatten(body)
+        body = self.flatten(body)
 
         condition = reduce(iand, [Attr(k).exists() for k in self.primary_key.keys()])
 
@@ -123,7 +123,7 @@ class DynamodbEntity(Entity):
         :return:
         """
         self.validate('PUT', body)
-        body = flatten(body)
+        body = self.flatten(body)
 
         k = list(self.primary_key.keys())[0]
         condition = Attr(k).not_exists()
