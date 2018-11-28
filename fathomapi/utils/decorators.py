@@ -38,8 +38,11 @@ class require:
                     kwargs['principal_id'] = principal_id
                     return decorated_function(*args, **kwargs)
                 except TypeError:
-                    del kwargs['principal_id']
-                    return decorated_function(*args, **kwargs)
+                    pass
+
+                # Try again without the `principal_id` arg
+                del kwargs['principal_id']
+                return decorated_function(*args, **kwargs)
             return wrapper
 
         @staticmethod

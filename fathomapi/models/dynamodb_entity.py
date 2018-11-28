@@ -1,10 +1,9 @@
 from ._entity import Entity
-from abc import abstractmethod
 from boto3.dynamodb.conditions import Key, Attr, ConditionExpressionBuilder
 from botocore.exceptions import ClientError
 from decimal import Decimal
 from functools import reduce
-from operator import iand
+from operator import iand, ior
 import boto3
 import datetime
 import json
@@ -25,13 +24,13 @@ class DynamodbEntity(Entity):
         self._secondary_key = None
 
     @classmethod
-    def get_many(cls, **kwargs):
+    def get_many(cls, index=None, **kwargs):
         if len(kwargs) == 1:
             key, values = next(iter(kwargs.items()))
             if isinstance(values, list):
                 if len(values) > 100:
                     raise Exception('Can only scan for maximum of 100 keys at once')
-                keys = [{key: {'S': v}} for v in values]  # TODO this only supports string-type keys
+                kcx = reduce(ior, [Key(key).eq(v) for v in values])
             else:
                 raise Exception('DynamodbEntity.fetch_many() must be called as fetch_many(key: [value, ...])')
         elif len(kwargs) > 1:
@@ -39,31 +38,7 @@ class DynamodbEntity(Entity):
         else:
             raise Exception('Cannot scan whole table')
 
-        res = _dynamodb_client.batch_get_item(RequestItems={cls._dynamodb_table_name: {'Keys': keys}})
-
-        def _cast(field_type, value):
-            return {
-                'BOOL': lambda x: bool(x),
-                'L': lambda x: list(x),
-                'N': lambda x: float(x),
-                'NULL': lambda x: None,
-                'S': lambda x: x,
-                'SS': lambda x: list(x),
-            }[field_type](value)
-
-        ret = []
-        for row in res['Responses'][cls._dynamodb_table_name]:
-            # Unpack the weird {'stringytype': {'S': 'Stringyvalue'}, 'numerictype': {'N': '42'}} response
-            record = {attr_name: _cast(*list(v.items())[0]) for attr_name, v in row.items()}
-
-            obj = cls(record[key])
-            obj._hydrate(record)
-            ret.append(obj.get())
-
-        if len(res.get('UnprocessedKeys', [])) > 0:
-            raise Exception(f"Unprocessed keys in get_many(): {res['UnprocessedKeys']}")
-
-        return ret, None
+        return cls._query_dynamodb(kcx, index=index), None
 
     def _fetch(self):
         # And together all the elements of the primary key
@@ -161,7 +136,8 @@ class DynamodbEntity(Entity):
     def _get_dynamodb_resource(cls):
         return boto3.resource('dynamodb').Table(cls._dynamodb_table_name)
 
-    def _query_dynamodb(self, key_condition_expression, limit=10000, scan_index_forward=True, exclusive_start_key=None, index=None):
+    @classmethod
+    def _query_dynamodb(cls, key_condition_expression, limit=10000, scan_index_forward=True, exclusive_start_key=None, index=None):
         args = {
             'Select': 'ALL_ATTRIBUTES',
             'Limit': limit,
@@ -173,11 +149,11 @@ class DynamodbEntity(Entity):
         if index is not None:
             args['IndexName'] = index
 
-        ret = self._get_dynamodb_resource().query(**args)
+        ret = cls._get_dynamodb_resource().query(**args)
 
         if 'LastEvaluatedKey' in ret:
             # There are more records to be scanned
-            return ret['Items'] + self._query_dynamodb(key_condition_expression, limit, scan_index_forward, ret['LastEvaluatedKey'])
+            return ret['Items'] + cls._query_dynamodb(key_condition_expression, limit, scan_index_forward, ret['LastEvaluatedKey'])
         else:
             # No more items
             return ret['Items']
