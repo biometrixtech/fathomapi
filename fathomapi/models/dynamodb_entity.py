@@ -7,6 +7,7 @@ from operator import iand, ior
 import boto3
 import datetime
 import json
+import time
 
 from ..utils.formatters import format_datetime
 from ..utils.serialisable import json_serialise
@@ -25,20 +26,38 @@ class DynamodbEntity(Entity):
 
     @classmethod
     def _get_many(cls, index=None, **kwargs):
-        if len(kwargs) == 1:
-            key, values = next(iter(kwargs.items()))
-            if isinstance(values, list):
-                if len(values) > 100:
-                    raise Exception('Can only scan for maximum of 100 keys at once')
-                kcx = reduce(ior, [Key(key).eq(v) for v in values])
-            else:
-                raise Exception('DynamodbEntity.fetch_many() must be called as fetch_many(key: [value, ...])')
-        elif len(kwargs) > 1:
-            raise Exception('DynamodbEntity can only be filtered on one property')
-        else:
-            raise Exception('Cannot scan whole table')
 
-        return cls._query_dynamodb(kcx, index=index)
+        def _unserialise_ddb(field_type, value):
+            return {
+                'BOOL': lambda x: bool(x),
+                'L': lambda x: list(x),
+                'N': lambda x: float(x),
+                'NULL': lambda x: None,
+                'S': lambda x: x,
+                'SS': lambda x: list(x),
+            }[field_type](value)
+
+        if len(kwargs) == 1:
+            field, values = next(iter(kwargs.items()))
+            if isinstance(values, list):
+                # Get many by primary key
+                keys = [{field: {'S': v}} for v in values]
+                for i in range(0, len(keys), 100):
+                    res = _dynamodb_client.batch_get_item(RequestItems={cls._dynamodb_table_name: {'Keys': keys[i:i+100]}})
+                    for row in res['Responses'][cls._dynamodb_table_name]:
+                        # Unpack the weird {'stringytype': {'S': 'Stringyvalue'}, 'numerictype': {'N': '42'}} response
+                        record = {attr_name: _unserialise_ddb(*list(v.items())[0]) for attr_name, v in row.items()}
+                        ret = cls(record[field])
+                        yield ret
+            else:
+                # Get many range keys matching a partition key
+                yield from cls._query_dynamodb(Key(field).eq(values), index=index)
+
+        elif len(kwargs) > 1:
+            raise NotImplementedError('DynamodbEntity can only be filtered on one property')
+
+        else:
+            raise NotImplementedError('Cannot scan whole table')
 
     def _fetch(self):
         # And together all the elements of the primary key
@@ -137,26 +156,14 @@ class DynamodbEntity(Entity):
         return boto3.resource('dynamodb').Table(cls._dynamodb_table_name)
 
     @classmethod
-    def _query_dynamodb(cls, key_condition_expression, limit=10000, scan_index_forward=True, exclusive_start_key=None, index=None):
-        args = {
-            'Select': 'ALL_ATTRIBUTES',
-            'Limit': limit,
-            'KeyConditionExpression': key_condition_expression,
-            'ScanIndexForward': scan_index_forward,
-        }
-        if exclusive_start_key is not None:
-            args['ExclusiveStartKey'] = exclusive_start_key
-        if index is not None:
-            args['IndexName'] = index
-
-        ret = cls._get_dynamodb_resource().query(**args)
-
-        if 'LastEvaluatedKey' in ret:
-            # There are more records to be scanned
-            return ret['Items'] + cls._query_dynamodb(key_condition_expression, limit, scan_index_forward, ret['LastEvaluatedKey'])
-        else:
-            # No more items
-            return ret['Items']
+    def _query_dynamodb(cls, key_condition_expression, limit=10000, scan_index_forward=True, index=None):
+        return cls.IteratedCall(cls._get_dynamodb_resource().query, 'Items', 'ExclusiveStartKey')(
+            Select='ALL_ATTRIBUTES',
+            Limit=limit,
+            KeyConditionExpression=key_condition_expression,
+            ScanIndexForward=scan_index_forward,
+            IndexName=index,
+        )
 
     def _update_dynamodb(self, upsert, condition_expression):
             print(json.dumps({
@@ -243,3 +250,36 @@ class DynamodbEntity(Entity):
                 'parameter_values': self.parameter_values,
             })
 
+    class IteratedCall:
+        def __init__(self, method, results_key, pagination_key):
+            self._method = method
+            self._results_key = results_key
+            self._pagination_key = pagination_key
+
+            self._pagination_value = None
+            self._exponential_backoff = 128
+
+        def __call__(self, **kwargs):
+            try:
+                kwargs[self._pagination_key] = self._pagination_value
+                kwargs = {k: v for k, v in kwargs.items() if v is not None}
+
+                res = self._method(**kwargs)
+                ret = res[self._results_key]
+                self._exponential_backoff = 128
+
+                if self._pagination_key in res:
+                    # There are more records to be scanned
+                    self._pagination_value = res[self._pagination_key]
+                    ret += self(**kwargs)
+
+                return res[self._results_key]
+
+            except ClientError as e:
+                # TODO only retry on throttle
+                if self._exponential_backoff > 128 ** 1:
+                    raise
+                else:
+                    time.sleep(self._exponential_backoff / 1000)
+                    self._exponential_backoff *= 2
+                    return self(**kwargs)

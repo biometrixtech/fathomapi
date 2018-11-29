@@ -62,6 +62,7 @@ class CognitoEntity(Entity):
 
             if filter_function(obj):
                 yield obj
+                count += 1
 
         next_next_token = res.get('PaginationToken', None)
 
