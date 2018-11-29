@@ -24,7 +24,7 @@ class DynamodbEntity(Entity):
         self._secondary_key = None
 
     @classmethod
-    def get_many(cls, index=None, **kwargs):
+    def _get_many(cls, index=None, **kwargs):
         if len(kwargs) == 1:
             key, values = next(iter(kwargs.items()))
             if isinstance(values, list):
@@ -38,7 +38,7 @@ class DynamodbEntity(Entity):
         else:
             raise Exception('Cannot scan whole table')
 
-        return cls._query_dynamodb(kcx, index=index), None
+        return cls._query_dynamodb(kcx, index=index)
 
     def _fetch(self):
         # And together all the elements of the primary key

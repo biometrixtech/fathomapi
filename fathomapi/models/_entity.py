@@ -135,6 +135,21 @@ class Entity:
                 self._exists = False
         return self._exists
 
+    @classmethod
+    def get_many(cls, **kwargs):
+        """
+        Get many entities
+        :return: ReturnValuedGenerator
+        """
+        return ReturnValuedGenerator(cls._get_many(**kwargs))
+
+    @classmethod
+    def _get_many(cls, **kwargs):
+        """
+        Get many entities
+        """
+        raise NotImplementedError
+
     def get(self, include_internal_properties=False):
         if self._attributes is None:
             self._hydrate(self._fetch())
@@ -218,3 +233,14 @@ def camel_to_snake(string):
     """
     s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', string)
     return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+
+
+class ReturnValuedGenerator:
+    """
+    A Generator which has a return value
+    """
+    def __init__(self, gen):
+        self.gen = gen
+
+    def __iter__(self):
+        self.value = yield from self.gen

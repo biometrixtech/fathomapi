@@ -1,4 +1,4 @@
-from ._entity import Entity
+from ._entity import Entity, ReturnValuedGenerator
 from abc import abstractmethod
 from botocore.exceptions import ClientError, ParamValidationError
 import boto3
@@ -37,32 +37,40 @@ class CognitoEntity(Entity):
         return ret
 
     @classmethod
-    def get_many(cls, next_token=None, max_items=math.inf, **kwargs):
+    def _get_many(cls, next_token=None, max_items=math.inf, **kwargs):
         args = {'UserPoolId': cls.user_pool_id(), 'Limit': min(max_items, 60)}
         if len(kwargs) == 1:
-            raise NotImplementedError
+            key, value = next(iter(kwargs.items()))
+            if key not in ['id']:
+                raise NotImplementedError('CognitoEntity.get_many() can only be filtered on `id` property')
+            filter_function = lambda u: getattr(u, key) in value
         elif len(kwargs) > 1:
-            raise Exception('CognitoEntity can only be filtered on one property')
+            raise NotImplementedError('CognitoEntity.get_many() can only be filtered on one property')
+        else:
+            filter_function = lambda u: True
 
         if next_token is not None:
             args['PaginationToken'] = next_token
 
         res = _cognito_client.list_users(**args)
 
-        ret = []
+        count = 0
         for user in res['Users']:
             obj = cls(user['Username'])
             obj._hydrate(user['Attributes'])
             obj._id = user['Username']
-            ret.append(obj)
+
+            if filter_function(obj):
+                yield obj
 
         next_next_token = res.get('PaginationToken', None)
 
-        if next_next_token is not None and len(ret) < max_items:
-            ret2, next_next_token = cls.get_many(next_token=next_next_token, max_items=max_items - len(ret), **kwargs)
-            ret += ret2
+        if next_next_token is not None and count < max_items:
+            ret = cls.get_many(next_token=next_next_token, max_items=max_items - count, **kwargs)
+            yield from ret
+            return ret.value
 
-        return ret, next_next_token
+        return next_next_token
 
     def _fetch(self):
         try:

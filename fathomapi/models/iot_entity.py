@@ -43,7 +43,7 @@ class IotEntity(Entity):
         raise NotImplementedError
 
     @classmethod
-    def get_many(cls, next_token=None, max_items=math.inf, **kwargs):
+    def _get_many(cls, next_token=None, max_items=math.inf, **kwargs):
         args = {'maxResults': min(max_items, 100)}
         if len(kwargs) == 1:
             key, value = next(iter(kwargs.items()))
@@ -56,16 +56,18 @@ class IotEntity(Entity):
 
         res = iot_client.list_things(**args)
 
-        ret = []
+        count = 0
         for thing in res['things']:
             obj = cls(thing['thingName'])
             obj._hydrate(thing['attributes'])
-            ret.append(obj)
+            yield obj
+            count += 1
 
         next_next_token = res.get('nextToken', None)
 
-        if next_next_token is not None and len(ret) < max_items:
-            ret2, next_next_token = cls.get_many(next_token=next_next_token, max_items=max_items - len(ret), **kwargs)
-            ret += ret2
+        if next_next_token is not None and count < max_items:
+            ret = cls.get_many(next_token=next_next_token, max_items=max_items - count, **kwargs)
+            yield from ret
+            return ret.value
 
-        return ret, next_next_token
+        return next_next_token
