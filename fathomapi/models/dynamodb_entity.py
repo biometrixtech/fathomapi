@@ -48,6 +48,7 @@ class DynamodbEntity(Entity):
                         # Unpack the weird {'stringytype': {'S': 'Stringyvalue'}, 'numerictype': {'N': '42'}} response
                         record = {attr_name: _unserialise_ddb(*list(v.items())[0]) for attr_name, v in row.items()}
                         ret = cls(record[field])
+                        ret._hydrate(record)
                         yield ret
             else:
                 # Get many range keys matching a partition key
