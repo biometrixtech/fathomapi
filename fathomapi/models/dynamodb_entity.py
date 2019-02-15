@@ -55,7 +55,15 @@ class DynamodbEntity(Entity):
                 yield from cls._query_dynamodb(Key(field).eq(values), index=index)
 
         elif len(kwargs) > 1:
-            raise NotImplementedError('DynamodbEntity can only be filtered on one property')
+            # Get many range keys matching a partition key
+            if index is not None and len(index.split('-')) == 2 and all(b in kwargs for b in ['key', 'start', 'end']):
+                p_key = index.split('-')[0]
+                s_key = index.split('-')[1]
+                kcx = [Key(p_key).eq(kwargs['key']), Key(s_key).between(kwargs['start'], kwargs['end'])]
+                kcx = reduce(iand, kcx)
+                yield from cls._query_dynamodb(kcx, index=index)
+            else:
+                raise NotImplementedError('DynamodbEntity filter on multiple properties is not supported for given index')
 
         else:
             raise NotImplementedError('Cannot scan whole table')
