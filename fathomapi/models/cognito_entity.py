@@ -273,7 +273,7 @@ class CognitoEntity(Entity):
                 ret[f'{prefix}{key}'] = json.dumps(value)
             else:
                 ret[f'{prefix}{key}'] = str(value)
-        print(f'flatten input={d}, output={ret}')
+        # print(f'flatten input={d}, output={ret}')
         return ret
 
     @classmethod
