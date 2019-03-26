@@ -235,6 +235,9 @@ class CognitoEntity(Entity):
         except ClientError as e:
             if 'UserNotFoundException' in str(e):
                 raise NoSuchEntityException()
+            if 'NotAuthorizedException' in str(e):
+                details = str(e).split(':')[-1].strip(' ')
+                raise UnauthorizedException(details)
             raise
         if 'ChallengeName' in response and response['ChallengeName'] == "NEW_PASSWORD_REQUIRED":
             # Need to set a new password

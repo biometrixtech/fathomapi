@@ -99,9 +99,9 @@ class require:
                         # Absence of key is allowed
                         continue
                     elif key in body:
-                        raise InvalidSchemaException(f"Property '{prefix}{key}' cannot be null")
+                        raise InvalidSchemaException(f"'{prefix}{key}' cannot be null")
                     else:
-                        raise InvalidSchemaException(f"Property '{prefix}{key}' is required")
+                        raise InvalidSchemaException(f"'{prefix}{key}' is a required field")
 
                 if isinstance(key_schema, (tuple, list)):
                     key_schema = tuple(filter(None, key_schema))
