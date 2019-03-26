@@ -112,8 +112,9 @@ class require:
                     validate_dict(body[key], key_schema, prefix=f'{prefix}{key}')
 
                 # TODO basic type validation
-                elif isinstance(key_schema, (str, int, float, bool)):
-                    pass
+                elif schema[key] in  (str, int, float, bool, list):
+                    if not isinstance(value, schema[key]):
+                        raise InvalidSchemaException(f"Property '{prefix}{key}' must be of type '{key_schema.__name__}'")
 
                 elif issubclass(key_schema, BaseConverter):
                     # Validate
