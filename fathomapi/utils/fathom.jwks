@@ -7,7 +7,7 @@
             "kid": "fathom_001",
             "alg": "RS256",
             "n": "snrCqqeNgc2tCxis2uFyhKw1V7Ob-FM01yIWUjZMGxow0q5_yssbiWN9AdR8MW2EX-fSdXZpwnEQkaP0XGNF0RWm98GfB7O8aw_lLIeBMDvSkMaD9WBS8yABuLHThUS99RRUlmhygVgjGxyF7G5hcw-ktwZRK-tGXZmhX0rCkNVz8NpfDqERvXE8tJZ3dB8v9Ea8xxjUNG1ttGJ6R1IxxY2IvPchwKVB3exsmEoQ2WPDAngdZodNdazhAGpm9cG1xoUs_2Px3rWcTo3SAzOe8QeuFa9el5x-ktLkb_3E1GqasymUwTbaa1y41xozMqWwN8dC-9t17Z29H9D6QwBLIQ",
-            "_environments": ["dev", "test"]
+            "_environments": ["dev", "test", "public"]
         },
         {
             "kty": "RSA",
