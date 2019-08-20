@@ -216,7 +216,7 @@ def _get_rs256_public_key(raw_token):
         else:
             match = re.match(r'^(?P<partner>[a-z][a-z0-9\-]+)_(?P<kid>[a-z0-9]+)$', key_id)
             if match:
-                _, partner, kid = match
+                partner, kid = match.groups()
                 if partner == 'fathom':
                     keyset_file = os.path.join(os.path.dirname(os.path.realpath(sys.modules['fathomapi'].__file__)), 'data/auth/fathom.jwks')
                 else:
