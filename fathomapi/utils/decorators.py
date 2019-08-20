@@ -186,7 +186,7 @@ def _get_rs256_public_key(raw_token):
 
     def is_valid_key(tup):
         key = tup[1]
-        environments = list(keys.get('_env', keys.get('_environments', [Config.get('ENVIRONMENT')])))
+        environments = list(key.get('_env', key.get('_environments', [Config.get('ENVIRONMENT')])))
         if Config.get('ENVIRONMENT') not in environments:
             # Key is not for this environment
             return False
