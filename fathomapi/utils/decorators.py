@@ -8,6 +8,7 @@ import json
 import os
 import re
 import requests
+import sys
 
 from .exceptions import UnauthorizedException, InvalidSchemaException, ForbiddenException
 from ..api.config import Config
@@ -176,30 +177,62 @@ def _authenticate_jwt(raw_token):
         raise UnauthorizedException('JWT token verification failed')
 
 
-cognito_keys_cache = {}
+_jwt_keys_cache = {}
 
 
 @xray_recorder.capture('fathomapi.utils.decorators._get_rs256_public_key')
 def _get_rs256_public_key(raw_token):
-    key_id = jwt.get_unverified_header(raw_token)['kid']
+    global _jwt_keys_cache
 
-    if key_id not in cognito_keys_cache:
-        if re.match('^fathom_\d+$', key_id):
-            path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fathom.jwks')
-            print(f'Loading local keys from {path}')
-            with open(path, 'r') as f:
-                keys = json.load(f)['keys']
-                # Include only keys for this environment
-                keys = filter(lambda k: Config.get('ENVIRONMENT') in k['_environments'], keys)
-        else:
+    def is_valid_key(tup):
+        key = tup[1]
+        environments = list(keys.get('_env', keys.get('_environments', [Config.get('ENVIRONMENT')])))
+        if Config.get('ENVIRONMENT') not in environments:
+            # Key is not for this environment
+            return False
+        if '_exp' in key and datetime.datetime.fromtimestamp(key['_exp']) < datetime.datetime.utcnow():
+            # Key has expired
+            return False
+        if '_nbf' in key and datetime.datetime.fromtimestamp(key['_nbf']) > datetime.datetime.utcnow():
+            # Key has not yet been enabled
+            return False
+        return True
+
+    # Clear out expired keys
+    _jwt_keys_cache = dict(filter(is_valid_key, _jwt_keys_cache.items()))
+
+    key_id = jwt.get_unverified_header(raw_token)['kid']
+    iss = jwt.get_unverified_claims(raw_token)['iss']
+
+    if key_id not in _jwt_keys_cache:
+        if 'cognito-idp' in iss:
             token = jwt.get_unverified_claims(raw_token)
             cognito_userpool_id = token['iss'].split('/')[-1]
             cognito_keys_url = f'https://cognito-idp.{Config.get("AWS_DEFAULT_REGION")}.amazonaws.com/{cognito_userpool_id}/.well-known/jwks.json'
             print(f'Loading new keys from {cognito_keys_url}')
             keys = requests.get(cognito_keys_url).json()['keys']
-        cognito_keys_cache.update({k['kid']: k for k in keys})
+            _jwt_keys_cache.update({k['kid']: k for k in keys})
 
-    if key_id not in cognito_keys_cache:
-        raise UnauthorizedException('Unknown signing key')
+        else:
+            match = re.match(r'^(?P<partner>[a-z][a-z0-9\-]+)_(?P<kid>[a-z0-9]+)$', key_id)
+            if match:
+                _, partner, kid = match
+                if partner == 'fathom':
+                    keyset_file = os.path.join(os.path.dirname(os.path.realpath(sys.modules['fathomapi'].__file__)), 'data/auth/fathom.jwks')
+                else:
+                    keyset_file = os.path.join(os.path.dirname(os.path.realpath(sys.modules['__main__'].__file__)), 'data/auth/example.jwks')
 
-    return cognito_keys_cache[key_id]
+                if os.path.isfile(keyset_file):
+                    print(f'Loading local keys from {keyset_file}')
+                    with open(keyset_file, 'r') as f:
+                        keys = json.load(f)['keys']
+                        _jwt_keys_cache.update(filter(is_valid_key, {k['kid']: k for k in keys}))
+                else:
+                    raise UnauthorizedException(f'Provider {partner} is not authorised to access this service')
+            else:
+                raise UnauthorizedException(f'Public key {key_id} is not authorised to sign requests to this service')
+
+    if key_id not in _jwt_keys_cache:
+        raise UnauthorizedException(f'Unknown signing key {key_id}')
+
+    return _jwt_keys_cache[key_id]
