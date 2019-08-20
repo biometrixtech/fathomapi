@@ -220,10 +220,10 @@ def _get_rs256_public_key(raw_token):
                 if partner == 'fathom':
                     keyset_file = os.path.join(os.path.dirname(os.path.realpath(sys.modules['fathomapi'].__file__)), 'data/auth/fathom.jwks')
                 else:
-                    keyset_file = os.path.join(os.path.dirname(os.path.realpath(sys.modules['__main__'].__file__)), 'data/auth/example.jwks')
+                    keyset_file = os.path.join(os.path.dirname(os.path.realpath(sys.modules['__main__'].__file__)), f'data/auth/{partner}.jwks')
 
+                print(f'Searching for local keys in {keyset_file}')
                 if os.path.isfile(keyset_file):
-                    print(f'Loading local keys from {keyset_file}')
                     with open(keyset_file, 'r') as f:
                         keys = json.load(f)['keys']
                         _jwt_keys_cache.update(filter(is_valid_key, {k['kid']: k for k in keys}))
