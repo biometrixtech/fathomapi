@@ -173,8 +173,8 @@ def _authenticate_jwt(raw_token):
         raise
     except JWTError as e:
         raise UnauthorizedException(str(e))
-    except Exception:
-        raise UnauthorizedException('JWT token verification failed')
+    except Exception as e:
+        raise UnauthorizedException(f'JWT token verification failed: {str(e)}')
 
 
 _jwt_keys_cache = {}
@@ -186,6 +186,7 @@ def _get_rs256_public_key(raw_token):
 
     def is_valid_key(tup):
         key = tup[1]
+        print(key)
         environments = list(key.get('_env', key.get('_environments', [Config.get('ENVIRONMENT')])))
         if Config.get('ENVIRONMENT') not in environments:
             # Key is not for this environment
