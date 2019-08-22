@@ -185,10 +185,10 @@ def _get_rs256_public_key(raw_token):
     global _jwt_keys_cache
 
     def is_valid_key(tup):
+        print(tup)
         key = tup[1]
         print(key)
-        environments = list(key.get('_env', key.get('_environments', [Config.get('ENVIRONMENT')])))
-        if Config.get('ENVIRONMENT') not in environments:
+        if '_env' in key and Config.get('ENVIRONMENT') not in list(key['_env']):
             # Key is not for this environment
             return False
         if '_exp' in key and datetime.datetime.fromtimestamp(key['_exp']) < datetime.datetime.utcnow():
@@ -230,7 +230,7 @@ def _get_rs256_public_key(raw_token):
                         print(file)
                         keys = file['keys']
                         print(keys)
-                        _jwt_keys_cache.update(filter(is_valid_key, {k['kid']: k for k in keys}))
+                        _jwt_keys_cache.update(filter(is_valid_key, [(k['kid'], k) for k in keys]))
                 else:
                     raise UnauthorizedException(f'Provider {partner} is not authorised to access this service')
             else:
