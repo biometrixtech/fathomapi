@@ -141,8 +141,8 @@ class require:
 def _authenticate_jwt(raw_token):
 
     if request.headers['X-Source'] == 'sqs':
-        # Authentication is not required for asynchronous executions
-        return None
+        # Authentication is not required for asynchronous executions, so treat it as a service call
+        return '00000000-0000-4000-8000-000000000000'
 
     try:
         algorithm = jwt.get_unverified_header(raw_token)['alg']
