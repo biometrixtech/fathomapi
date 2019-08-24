@@ -140,6 +140,10 @@ class require:
 @xray_recorder.capture('fathomapi.utils.decorators._authenticate_jwt')
 def _authenticate_jwt(raw_token):
 
+    if request.headers['X-Source'] == 'sqs':
+        # Authentication is not required for asynchronous executions
+        return None
+
     try:
         algorithm = jwt.get_unverified_header(raw_token)['alg']
         if algorithm == 'RS256':

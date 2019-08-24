@@ -1,3 +1,4 @@
+from flask import request
 import datetime
 import json
 import random
@@ -16,7 +17,7 @@ class Service:
     def call_apigateway_sync(self, method, endpoint, body=None, headers=None):
         if headers is None:
             headers = {}
-        headers.update({'Authorization': _get_service_token()})
+        headers.update({'Authorization': request.headers['Authorization']})
 
         return invoke_apigateway_sync(self.name, self.version, method, endpoint, body, headers)
 
@@ -28,7 +29,6 @@ class Service:
     def call_apigateway_async_multi(self, calls, execute_at=None, jitter=0):
         if execute_at is None:
             execute_at = datetime.datetime.now()
-        service_token = _get_service_token()
 
         for i in range(0, len(calls), 10):
             jitter_offset = datetime.timedelta(seconds=random.randint(0, jitter))
@@ -37,7 +37,7 @@ class Service:
                 "httpMethod": call['method'],
                 "headers": {
                     "Accept": "*/*",
-                    "Authorization": service_token,
+                    "Authorization": 'NOT_APPLICABLE',
                     "Content-Type": "application/json",
                     "User-Agent": f"Biometrix/API {self.name}:{self.version}",
                     "X-Execute-At": format_datetime(execute_at + jitter_offset),
@@ -58,12 +58,3 @@ class Service:
 
 _service_token = None
 _service_token_expiry = None
-
-
-@xray_recorder.capture('fathomapi.comms.service._get_service_token')
-def _get_service_token():
-    global _service_token, _service_token_expiry
-    if _service_token is None or _service_token_expiry < datetime.datetime.now():
-        _service_token = invoke_lambda_sync('users-{ENVIRONMENT}-apigateway-serviceauth', '2_0')['token']
-        _service_token_expiry = datetime.datetime.now() + datetime.timedelta(minutes=10)
-    return _service_token
