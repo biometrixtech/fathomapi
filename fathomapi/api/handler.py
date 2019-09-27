@@ -21,6 +21,7 @@ def handler(event, context):
         event['headers']['X-Source'] = 'apigateway'
 
     Config.set('API_VERSION', event['stageVariables']['LambdaAlias'])
+    Config.set('REQUEST_TIME', event['requestContext']['requestTimeEpoch'])
 
     response = LambdaResponse()
 
