@@ -22,7 +22,8 @@ def format_datetime(date_input):
     return date_input.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 def parse_datetime(date_input):
-    for format_string in ["%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S.%fZ"]:
+    for format_string in ["%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S.%fZ",
+                          "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S.%f"]:
         try:
             return datetime.datetime.strptime(date_input, format_string)
         except ValueError:
