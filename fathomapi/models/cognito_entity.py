@@ -106,16 +106,18 @@ class CognitoEntity(Entity):
                     attributes_to_update.append({'Name': param_name, 'Value': body[key]})
 
         if self.exists():
-            _cognito_client.admin_update_user_attributes(
-                UserPoolId=self.user_pool_id(),
-                Username=self.id,
-                UserAttributes=attributes_to_update
-            )
-            _cognito_client.admin_delete_user_attributes(
-                UserPoolId=self.user_pool_id(),
-                Username=self.id,
-                UserAttributeNames=attributes_to_delete
-            )
+            if len(attributes_to_update) > 0:
+                _cognito_client.admin_update_user_attributes(
+                    UserPoolId=self.user_pool_id(),
+                    Username=self.id,
+                    UserAttributes=attributes_to_update
+                )
+            if len(attributes_to_delete) > 0:
+                _cognito_client.admin_delete_user_attributes(
+                    UserPoolId=self.user_pool_id(),
+                    Username=self.id,
+                    UserAttributeNames=attributes_to_delete
+                )
         else:
             # TODO
             raise NotImplementedError('Cannot patch, user does not exist')

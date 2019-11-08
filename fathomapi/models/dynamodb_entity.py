@@ -189,13 +189,15 @@ class DynamodbEntity(Entity):
             # Update updated_date, if we're updating anything else
             upsert.set('updated_date', format_datetime(datetime.datetime.now()))
 
-            self._get_dynamodb_resource().update_item(
+            resp = self._get_dynamodb_resource().update_item(
                 Key=self.primary_key,
                 UpdateExpression=upsert.update_expression,
                 ExpressionAttributeNames=upsert.parameter_names,
                 ExpressionAttributeValues=upsert.parameter_values,
-                ConditionExpression=condition_expression
+                ConditionExpression=condition_expression,
+                ReturnValues="ALL_NEW"
             )
+            self._hydrate(resp['Attributes'])
 
             return self.get()
 
