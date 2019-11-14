@@ -3,6 +3,7 @@ from urllib.parse import urlencode
 from werkzeug.wrappers import BaseRequest
 import json
 import sys
+import time
 
 from .config import Config
 from .flask_app import app
@@ -21,8 +22,11 @@ def handler(event, context):
         event['headers']['X-Source'] = 'apigateway'
 
     Config.set('API_VERSION', event['stageVariables']['LambdaAlias'])
-    Config.set('REQUEST_TIME', event['requestContext']['requestTimeEpoch'])
-
+    try:
+        request_time = event['requestContext']['requestTimeEpoch']
+    except:
+        request_time = int(time.time() * 1000)
+    Config.set('REQUEST_TIME', request_time)
     response = LambdaResponse()
 
     ret = app(_make_environ(event), response.start_response)
